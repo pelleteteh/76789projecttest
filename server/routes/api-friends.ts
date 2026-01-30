@@ -7,7 +7,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { friends, users } from '../../shared/schema';
 import { eq, and, or } from 'drizzle-orm';
-import { isAuthenticated } from '../middleware/auth';
+import { SupabaseAuthMiddleware } from '../supabaseAuth';
 import { NotificationService, NotificationEvent, NotificationChannel, NotificationPriority } from '../notificationService';
 
 const router = Router();
@@ -17,7 +17,7 @@ const notificationService = new NotificationService();
  * POST /api/friends/request
  * Send friend request to another user
  */
-router.post('/request', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/request', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { targetUserId } = req.body;
     const userId = req.user?.id;
@@ -124,7 +124,7 @@ router.post('/request', isAuthenticated, async (req: Request, res: Response) => 
  * POST /api/friends/accept/:requestId
  * Accept a friend request
  */
-router.post('/accept/:requestId', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/accept/:requestId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { requestId } = req.params;
     const userId = req.user?.id;
@@ -210,7 +210,7 @@ router.post('/accept/:requestId', isAuthenticated, async (req: Request, res: Res
  * POST /api/friends/reject/:requestId
  * Reject a friend request
  */
-router.post('/reject/:requestId', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/reject/:requestId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { requestId } = req.params;
     const userId = req.user?.id;
@@ -259,7 +259,7 @@ router.post('/reject/:requestId', isAuthenticated, async (req: Request, res: Res
  * GET /api/friends
  * Get all friends for current user
  */
-router.get('/', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -325,7 +325,7 @@ router.get('/', isAuthenticated, async (req: Request, res: Response) => {
  * GET /api/friends/requests
  * Get pending friend requests for current user
  */
-router.get('/requests', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/requests', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -385,7 +385,7 @@ router.get('/requests', isAuthenticated, async (req: Request, res: Response) => 
  * DELETE /api/friends/:friendId
  * Remove a friend
  */
-router.delete('/:friendId', isAuthenticated, async (req: Request, res: Response) => {
+router.delete('/:friendId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { friendId } = req.params;
     const userId = req.user?.id;
@@ -435,7 +435,7 @@ router.delete('/:friendId', isAuthenticated, async (req: Request, res: Response)
  * GET /api/friends/status/:userId
  * Check friendship status with another user
  */
-router.get('/status/:userId', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/status/:userId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const targetUserId = req.params.userId;
@@ -487,7 +487,7 @@ router.get('/status/:userId', isAuthenticated, async (req: Request, res: Respons
  * GET /api/friends/sent-requests
  * Get pending friend requests sent by current user
  */
-router.get('/sent-requests', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/sent-requests', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -544,7 +544,7 @@ router.get('/sent-requests', isAuthenticated, async (req: Request, res: Response
   }
 });
 
-router.get('/status/:userId', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/status/:userId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { userId: targetUserId } = req.params;
     const userId = req.user?.id;

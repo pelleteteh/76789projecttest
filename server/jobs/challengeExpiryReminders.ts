@@ -26,7 +26,7 @@ export async function sendChallengeExpiryReminders() {
         and(
           eq(challenges.status, 'active'),
           lt(challenges.dueDate, oneHourFromNow),
-          isNull(challenges.resolutionTimestamp) // Not yet resolved
+          isNull(challenges.completedAt) // Not yet completed
         )
       );
 

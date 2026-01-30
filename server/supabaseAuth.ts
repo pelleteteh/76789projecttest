@@ -1,57 +1,35 @@
-import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_change_in_production';
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-}
-
-// Initialize Supabase client with service role key
-const supabaseAdmin = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
 
 /**
  * Create or get a user by wallet address
  * Called after Privy authenticates the wallet
+ * 
+ * This function generates a deterministic user ID from the wallet address
+ * without needing to connect to Supabase API (avoiding DNS/network issues)
  */
 export async function getOrCreateSupabaseUser(walletAddress: string, email?: string) {
   try {
-    console.log(`🔑 Creating/fetching Supabase user for wallet: ${walletAddress}`);
+    console.log(`🔑 Creating JWT user for wallet: ${walletAddress}`);
     
-    // Try to get existing user
-    let user = await supabaseAdmin.auth.admin.listUsers();
-    
-    // For now, use wallet as both ID and email if not provided
-    const userEmail = email || `${walletAddress.toLowerCase()}@wallet.local`;
-    
-    // Create user with wallet address as metadata
-    const { data: userData, error } = await supabaseAdmin.auth.admin.createUser({
-      email: userEmail,
-      password: walletAddress.slice(-32), // Use wallet as password (won't be used)
-      email_confirm: true,
-      user_metadata: {
-        wallet_address: walletAddress.toLowerCase(),
-      },
-    });
-
-    if (error && !error.message.includes('already exists')) {
-      console.error('❌ Error creating Supabase user:', error.message);
+    if (!walletAddress) {
+      console.error('❌ No wallet address provided');
       return null;
     }
 
-    const userId = userData?.user?.id;
-    console.log(`✅ Supabase user ready: ${userId}`);
+    // Generate a deterministic user ID from wallet address
+    // This ensures the same wallet always gets the same user ID
+    const userId = crypto
+      .createHash('sha256')
+      .update(walletAddress.toLowerCase())
+      .digest('hex')
+      .slice(0, 32); // Use first 32 chars as user ID
+    
+    const userEmail = email || `${walletAddress.toLowerCase()}@wallet.local`;
+    
+    console.log(`✅ User ready: ${userId}`);
 
     return {
       id: userId,
@@ -66,8 +44,9 @@ export async function getOrCreateSupabaseUser(walletAddress: string, email?: str
 
 /**
  * Generate a Supabase-compatible JWT token
+ * Uses local signing - no external API calls needed
  */
-export async function generateSupabaseToken(userId: string, walletAddress: string) {
+export function generateSupabaseToken(userId: string, walletAddress: string) {
   try {
     console.log(`🔐 Generating JWT for user: ${userId}`);
     
@@ -100,7 +79,7 @@ export async function generateSupabaseToken(userId: string, walletAddress: strin
 /**
  * Verify a Supabase JWT token
  */
-export async function verifySupabaseToken(token: string) {
+export function verifySupabaseToken(token: string) {
   try {
     console.log('🔍 Verifying JWT token...');
     
@@ -119,7 +98,7 @@ export async function verifySupabaseToken(token: string) {
 /**
  * Middleware to verify Supabase JWT
  */
-export async function SupabaseAuthMiddleware(req: any, res: any, next: any) {
+export function SupabaseAuthMiddleware(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;
   const url = req.originalUrl || req.url;
   
@@ -141,7 +120,7 @@ export async function SupabaseAuthMiddleware(req: any, res: any, next: any) {
   console.log(`🔑 Token received (${token.length} chars)`);
 
   try {
-    const decoded = await verifySupabaseToken(token);
+    const decoded = verifySupabaseToken(token);
 
     if (!decoded || !decoded.sub) {
       console.error('❌ Invalid token or no user ID');

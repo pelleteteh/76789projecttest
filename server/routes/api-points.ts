@@ -4,7 +4,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { isAuthenticated } from '../auth';
+import { SupabaseAuthMiddleware } from '../supabaseAuth';
 import { getBlockchainClient } from '../blockchain/client';
 import {
   getUserPointsBalance,
@@ -22,7 +22,7 @@ import {
 import { userPointsLedgers, pointsTransactions } from '../../shared/schema-blockchain';
 import { db } from '../db';
 import { users } from '../../shared/schema';
-import { desc, gt, eq } from 'drizzle-orm';
+import { desc, gt, eq, sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -35,7 +35,7 @@ const router = Router();
  *   - lastClaimedAt: Timestamp of last weekly claim
  *   - canClaimThisWeek: Boolean indicating if user can claim now
  */
-router.get('/balance/:userId', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/balance/:userId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
@@ -69,7 +69,7 @@ router.get('/balance/:userId', isAuthenticated, async (req: Request, res: Respon
  * Transfer points from one user to another
  * Only on-chain transfers are supported (for security)
  */
-router.post('/transfer', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/transfer', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { recipientId, amount } = req.body;
     const userId = req.user?.id;
@@ -203,7 +203,7 @@ router.get('/leaderboard', async (req: Request, res: Response) => {
  * GET /api/points/leaderboard/:userId
  * Get user's leaderboard rank and stats
  */
-router.get('/leaderboard/:userId', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/leaderboard/:userId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
@@ -257,7 +257,7 @@ router.get('/leaderboard/:userId', isAuthenticated, async (req: Request, res: Re
  * GET /api/points/history/:userId
  * Get user's points transaction history
  */
-router.get('/history/:userId', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/history/:userId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { limit = 50, offset = 0, type } = req.query;
@@ -310,7 +310,7 @@ router.get('/statistics', async (req: Request, res: Response) => {
  * POST /api/points/connect-wallet
  * Connect blockchain wallet to user account
  */
-router.post('/connect-wallet', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/connect-wallet', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { walletAddress, walletType } = req.body;
     const userId = req.user?.id;
@@ -355,7 +355,7 @@ router.post('/connect-wallet', isAuthenticated, async (req: Request, res: Respon
  * GET /api/points/wallets
  * Get user's connected wallets
  */
-router.get('/wallets', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/wallets', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -388,7 +388,7 @@ router.get('/wallets', isAuthenticated, async (req: Request, res: Response) => {
  * POST /api/points/set-primary-wallet/:walletId
  * Set primary wallet for transactions
  */
-router.post('/set-primary-wallet/:walletId', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/set-primary-wallet/:walletId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { walletId } = req.params;
     const userId = req.user?.id;
@@ -429,7 +429,7 @@ router.post('/set-primary-wallet/:walletId', isAuthenticated, async (req: Reques
  *   - transactionId: Database transaction ID for this claim
  *   - nextClaimDate: When admin can claim next
  */
-router.post('/admin/claim-weekly', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/admin/claim-weekly', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const adminId = req.user?.id;
     const { walletAddress } = req.body;
@@ -518,7 +518,7 @@ router.post('/admin/claim-weekly', isAuthenticated, async (req: Request, res: Re
  *   - lastClaimedAt: When admin last claimed
  *   - nextClaimDate: When they can claim next
  */
-router.get('/admin/weekly-earnings', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/admin/weekly-earnings', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const adminId = req.user?.id;
 
@@ -595,7 +595,7 @@ router.get('/admin/weekly-earnings', isAuthenticated, async (req: Request, res: 
  *     - weeklyEarnings: Points earned this week
  *     - transactionCount: Number of transactions this week
  */
-router.get('/admin/user-weekly-earnings', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/admin/user-weekly-earnings', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const adminId = req.user?.id;
 
@@ -684,7 +684,7 @@ router.get('/admin/user-weekly-earnings', isAuthenticated, async (req: Request, 
  *   - totalAmount: Total points distributed
  *   - payouts: Array of processed payout records
  */
-router.post('/admin/payout-weekly', isAuthenticated, async (req: Request, res: Response) => {
+router.post('/admin/payout-weekly', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const adminId = req.user?.id;
     const { payouts } = req.body;

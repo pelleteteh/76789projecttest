@@ -28,7 +28,7 @@ router.post('/wallet-login', async (req: Request, res: Response) => {
     }
 
     // Generate a Supabase JWT token
-    const token = await generateSupabaseToken(user.id, walletAddress);
+    const token = generateSupabaseToken(user.id, walletAddress);
 
     if (!token) {
       return res.status(500).json({ error: 'Failed to generate token' });

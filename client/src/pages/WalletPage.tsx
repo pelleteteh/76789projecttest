@@ -158,28 +158,22 @@ export default function WalletPage() {
 
     const syncWallet = async () => {
       try {
-        const res = await fetch("/api/points/connect-wallet", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            walletAddress: privyUser.wallet.address,
-            walletType: "privy",
-          }),
+        await apiRequest("POST", "/api/points/connect-wallet", {
+          walletAddress: privyUser.wallet.address,
+          walletType: "privy",
         });
 
-        if (!res.ok) {
-          const error = await res.json();
-          // 409 Conflict = already connected, that's fine
-          if (res.status !== 409) {
-            console.warn("Failed to sync wallet:", error);
-          }
-        } else {
-          console.log("✅ Wallet synced to database");
-          // Refetch wallets list after sync
-          queryClient.invalidateQueries({ queryKey: ["/api/points/wallets", user.id] });
-        }
+        console.log("✅ Wallet synced to database");
+        // Refetch wallets list after sync
+        queryClient.invalidateQueries({ queryKey: ["/api/points/wallets", user.id] });
       } catch (err) {
-        console.error("Error syncing wallet:", err);
+        // apiRequest throws with status in message; tolerate 409 (already connected)
+        const msg = (err as any)?.message || '';
+        if (msg.includes('409')) {
+          console.log('Wallet already connected (409)');
+        } else {
+          console.error("Error syncing wallet:", err);
+        }
       }
     };
 
@@ -212,9 +206,7 @@ export default function WalletPage() {
     enabled: !!user?.id,
     retry: false,
     queryFn: async () => {
-      const res = await fetch(`/api/points/balance/${user.id}`);
-      if (!res.ok) throw new Error('Failed to fetch points balance');
-      return res.json();
+      return await apiRequest("GET", `/api/points/balance/${user.id}`);
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
@@ -235,9 +227,7 @@ export default function WalletPage() {
     enabled: !!user?.id,
     retry: false,
     queryFn: async () => {
-      const res = await fetch(`/api/points/wallets`);
-      if (!res.ok) throw new Error('Failed to fetch wallets');
-      return res.json();
+      return await apiRequest("GET", `/api/points/wallets`);
     },
   });
 

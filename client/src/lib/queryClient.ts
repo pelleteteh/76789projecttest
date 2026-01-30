@@ -9,13 +9,33 @@ function throwIfResNotOk(res: Response) {
 // Store token from Privy authentication (set by the useAuth hook)
 let cachedAuthToken: string | null = null;
 
+const TOKEN_STORAGE_KEY = 'supabaseAuthToken';
+
 export function setAuthToken(token: string | null) {
   cachedAuthToken = token;
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch (err) {
+    // ignore localStorage failures in SSR or restricted environments
+  }
 }
 
-// Get the cached auth token that was set by useAuth hook
 function getAuthToken(): string | null {
-  return cachedAuthToken;
+  if (cachedAuthToken) return cachedAuthToken;
+  try {
+    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (stored) {
+      cachedAuthToken = stored;
+      return stored;
+    }
+  } catch (err) {
+    // ignore
+  }
+  return null;
 }
 
 export async function apiRequest(
@@ -86,11 +106,14 @@ export const queryClient = new QueryClient({
         }
 
         const authToken = getAuthToken();
-        
-        // Debug logging for queries
-        if (!authToken) {
-          console.warn('No auth token found for query to:', fullUrl);
-        }
+          // Debug logging for queries
+          if (!authToken) {
+            console.warn('No auth token found for query to:', fullUrl);
+          } else {
+            try {
+              console.debug('Using auth token for query to', fullUrl.split('/').pop(), 'tokenPrefix=', authToken.substring(0,8));
+            } catch {}
+          }
 
         const res = await fetch(fullUrl, {
           credentials: "include",
