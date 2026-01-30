@@ -76,8 +76,9 @@ export default function PointsAndBadges() {
 
   // Fetch user data and stats
   const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/profile"],
     retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const { data: userStats } = useQuery<UserStats>({

@@ -27,10 +27,10 @@ export async function apiRequest(
   
   // Debug logging
   if (!authToken) {
-    console.warn('⚠️ No auth token found for request to:', url);
-    console.warn('  Cached token:', cachedAuthToken);
+    console.error('❌ No auth token found for request to:', url);
+    console.warn('   This will likely result in 401 Unauthorized');
   } else {
-    console.debug('✅ Auth token found for request:', url.split('/').pop());
+    console.debug(`✅ Auth token found (${authToken.length} chars) for:`, url.split('/').pop());
   }
 
   const options: RequestInit = {

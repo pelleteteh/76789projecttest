@@ -153,6 +153,11 @@ export function MobileNavigation({
                 )}
 
                 {/* Badge Logic */}
+                {item.path === "/notifications" && unreadCount > 0 && (
+                  <Badge className="absolute -top-2 -right-2 w-4 h-4 flex items-center justify-center p-0 bg-red-500 text-white text-[8px]">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </Badge>
+                )}
                 {item.path === "/events" && eventsBadgeCount > 0 && (
                   <Badge className="absolute -top-2 -right-2 w-4 h-4 flex items-center justify-center p-0 bg-red-500 text-white text-[8px]">
                     {eventsBadgeCount > 9 ? "9+" : eventsBadgeCount}

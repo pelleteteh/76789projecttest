@@ -5,7 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { users, transactions } from '../../shared/schema';
+import { users, transactions, dailyLogins } from '../../shared/schema';
 import { eq, desc } from 'drizzle-orm';
 import { isAuthenticated } from '../middleware/auth';
 
@@ -207,6 +207,167 @@ router.patch('/profile', isAuthenticated, async (req: Request, res: Response) =>
     res.status(500).json({ 
       error: 'Failed to update profile',
       message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/user/stats
+ * Get user statistics (wins, friends, challenges created, etc.)
+ */
+router.get('/stats', isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get user profile for points and streak
+    const userRecord = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!userRecord || userRecord.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRecord[0];
+
+    // Return user stats
+    res.json({
+      wins: user.wins || 0,
+      friendsCount: user.friendsCount || 0,
+      eventWins: user.eventWins || 0,
+      challengesCreated: user.challengesCreated || 0,
+      streak: user.streak || 0,
+      points: user.points || 0,
+      coins: user.coins || 0,
+    });
+  } catch (error: any) {
+    console.error('Error fetching user stats:', error);
+    res.status(500).json({
+      error: 'Failed to fetch stats',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/user/achievements
+ * Get user achievements/badges
+ */
+router.get('/achievements', isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get user profile
+    const userRecord = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!userRecord || userRecord.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRecord[0];
+
+    // Define achievements based on user stats
+    const achievements = [
+      {
+        id: 'first_challenge',
+        name: 'First Win',
+        description: 'Win your first challenge',
+        unlocked: (user.wins || 0) >= 1,
+        unlockedAt: user.createdAt,
+        pointsReward: 100,
+      },
+      {
+        id: 'streak_master',
+        name: 'Streak Master',
+        description: 'Login 7 days in a row',
+        unlocked: (user.streak || 0) >= 7,
+        pointsReward: 250,
+      },
+      {
+        id: 'social_butterfly',
+        name: 'Social Butterfly',
+        description: 'Make 10 friends',
+        unlocked: (user.friendsCount || 0) >= 10,
+        pointsReward: 500,
+      },
+      {
+        id: 'big_better',
+        name: 'Big Better',
+        description: 'Win 5 events',
+        unlocked: (user.eventWins || 0) >= 5,
+        pointsReward: 300,
+      },
+      {
+        id: 'challenger',
+        name: 'Challenger',
+        description: 'Create 20 challenges',
+        unlocked: (user.challengesCreated || 0) >= 20,
+        pointsReward: 350,
+      },
+    ];
+
+    res.json(achievements);
+  } catch (error: any) {
+    console.error('Error fetching achievements:', error);
+    res.status(500).json({
+      error: 'Failed to fetch achievements',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/daily-signin/history
+ * Get user's daily login history
+ */
+router.get('/daily-signin/history', isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { limit = 30 } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const limitNum = Math.min(parseInt(limit as string) || 30, 365);
+
+    // Fetch daily logins
+    const logins = await db
+      .select()
+      .from(dailyLogins)
+      .where(eq(dailyLogins.userId, userId))
+      .orderBy(desc(dailyLogins.createdAt))
+      .limit(limitNum);
+
+    // Format response
+    const formattedLogins = logins.map((login) => ({
+      id: login.id,
+      streak: login.streak || 0,
+      pointsEarned: login.pointsEarned || 0,
+      claimed: login.claimed || false,
+      createdAt: login.createdAt,
+    }));
+
+    res.json(formattedLogins);
+  } catch (error: any) {
+    console.error('Error fetching daily signin history:', error);
+    res.status(500).json({
+      error: 'Failed to fetch daily signin history',
+      message: error.message,
     });
   }
 });

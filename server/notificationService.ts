@@ -156,6 +156,54 @@ export class NotificationService {
   }
 
   /**
+   * Compatibility method: Send notification with different parameter names
+   */
+  async sendNotification(payload: any): Promise<boolean> {
+    // Convert from old API to new API
+    const normalizedPayload: NotificationPayload = {
+      userId: payload.userId,
+      challengeId: payload.challengeId || '',
+      event: payload.event,
+      title: payload.title,
+      body: payload.message || payload.body || '',
+      channels: this.normalizeChannels(payload.channels || []),
+      priority: payload.priority || NotificationPriority.MEDIUM,
+      data: payload.metadata || payload.data,
+    };
+
+    return this.send(normalizedPayload);
+  }
+
+  /**
+   * Normalize channel names from old API
+   */
+  private normalizeChannels(channels: any[]): NotificationChannel[] {
+    const normalized: NotificationChannel[] = [];
+    
+    for (const channel of channels) {
+      if (channel === NotificationChannel.IN_APP || channel === 'pusher' || channel === 'PUSHER') {
+        if (!normalized.includes(NotificationChannel.IN_APP)) {
+          normalized.push(NotificationChannel.IN_APP);
+        }
+      } else if (channel === NotificationChannel.PUSH || channel === 'firebase' || channel === 'FIREBASE') {
+        if (!normalized.includes(NotificationChannel.PUSH)) {
+          normalized.push(NotificationChannel.PUSH);
+        }
+      } else if (typeof channel === 'string' && channel.includes('PUSHER')) {
+        if (!normalized.includes(NotificationChannel.IN_APP)) {
+          normalized.push(NotificationChannel.IN_APP);
+        }
+      } else if (typeof channel === 'string' && channel.includes('FIREBASE')) {
+        if (!normalized.includes(NotificationChannel.PUSH)) {
+          normalized.push(NotificationChannel.PUSH);
+        }
+      }
+    }
+    
+    return normalized.length > 0 ? normalized : [NotificationChannel.IN_APP];
+  }
+
+  /**
    * Rate limiting: Check if notification can be sent
    */
   private async checkRateLimits(payload: NotificationPayload): Promise<boolean> {

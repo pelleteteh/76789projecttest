@@ -9,21 +9,14 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { FOSMNotificationService } from '../notificationSystem';
+import { NotificationService } from '../notificationService';
 import { db } from '../db';
 import { notifications, userNotificationPreferences } from '../../shared/schema';
 import { eq, and, desc, count } from 'drizzle-orm';
+import { SupabaseAuthMiddleware } from '../supabaseAuth';
 
 const router = Router();
-const notificationService = new FOSMNotificationService();
-
-// Middleware to ensure user is authenticated
-const ensureAuth = (req: Request, res: Response, next: Function) => {
-  if (!req.user?.id) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-};
+const notificationService = new NotificationService();
 
 /**
  * GET /api/notifications
@@ -33,9 +26,19 @@ const ensureAuth = (req: Request, res: Response, next: Function) => {
  * - limit: number (default: 20)
  * - offset: number (default: 0)
  */
-router.get('/', ensureAuth, async (req: Request, res: Response) => {
+router.get('/', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    console.log('\n📬 GET /api/notifications called');
+    console.log(`   req.user:`, req.user ? `✅ Present (id: ${req.user.id})` : '❌ Missing');
+    console.log(`   userId extracted:`, userId || 'undefined');
+    
+    if (!userId) {
+      console.error('   ❌ No userId, returning 401');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    console.log(`   ✅ UserId found, fetching notifications...`);
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
@@ -47,14 +50,15 @@ router.get('/', ensureAuth, async (req: Request, res: Response) => {
       .limit(limit)
       .offset(offset);
 
-    const total = await db
-      .select({ count: count(notifications.id) })
+    // Count total notifications
+    const allNotifications = await db
+      .select()
       .from(notifications)
       .where(eq(notifications.userId, userId));
 
     res.json({
       data: userNotifications,
-      total: total[0].count,
+      total: allNotifications.length,
       limit,
       offset,
     });
@@ -65,19 +69,23 @@ router.get('/', ensureAuth, async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/notifications/unread
+ * GET /api/notifications/unread-count
  * Get count of unread notifications
  */
-router.get('/unread-count', ensureAuth, async (req: Request, res: Response) => {
+router.get('/unread-count', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
-    const unreadCount = await db
-      .select({ count: count(notifications.id) })
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const unreadNotifications = await db
+      .select()
       .from(notifications)
       .where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
 
-    res.json({ unreadCount: unreadCount[0].count });
+    res.json({ unreadCount: unreadNotifications.length });
   } catch (error) {
     console.error('Error fetching unread count:', error);
     res.status(500).json({ error: 'Failed to fetch unread count' });
@@ -88,10 +96,14 @@ router.get('/unread-count', ensureAuth, async (req: Request, res: Response) => {
  * PUT /api/notifications/:id/read
  * Mark notification as read
  */
-router.put('/:id/read', ensureAuth, async (req: Request, res: Response) => {
+router.put('/:id/read', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const notificationId = req.params.id;
     const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     // Verify ownership
     const notification = await db
@@ -114,10 +126,14 @@ router.put('/:id/read', ensureAuth, async (req: Request, res: Response) => {
 });
 
 // Support PATCH method for clients that use PATCH instead of PUT
-router.patch('/:id/read', ensureAuth, async (req: Request, res: Response) => {
+router.patch('/:id/read', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const notificationId = req.params.id;
     const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     // Verify ownership
     const notification = await db
@@ -143,9 +159,13 @@ router.patch('/:id/read', ensureAuth, async (req: Request, res: Response) => {
  * PUT /api/notifications/read-all
  * Mark all notifications as read
  */
-router.put('/read-all', ensureAuth, async (req: Request, res: Response) => {
+router.put('/read-all', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     await db
       .update(notifications)
@@ -163,10 +183,14 @@ router.put('/read-all', ensureAuth, async (req: Request, res: Response) => {
  * DELETE /api/notifications/:id
  * Delete a notification
  */
-router.delete('/:id', ensureAuth, async (req: Request, res: Response) => {
+router.delete('/:id', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const notificationId = req.params.id;
     const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     // Verify ownership
     const notification = await db
@@ -192,11 +216,16 @@ router.delete('/:id', ensureAuth, async (req: Request, res: Response) => {
  * DELETE /api/notifications/clear-all
  * Delete all notifications for user
  */
-router.delete('/clear-all', ensureAuth, async (req: Request, res: Response) => {
+router.delete('/clear-all', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
-    await notificationService.clearAllNotifications(userId);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Delete all notifications for this user
+    await db.delete(notifications).where(eq(notifications.userId, userId));
 
     res.json({ success: true, message: 'All notifications cleared' });
   } catch (error) {
@@ -209,9 +238,13 @@ router.delete('/clear-all', ensureAuth, async (req: Request, res: Response) => {
  * GET /api/notifications/preferences
  * Get user notification preferences
  */
-router.get('/preferences', ensureAuth, async (req: Request, res: Response) => {
+router.get('/preferences', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     const prefs = await db
       .select()
@@ -249,9 +282,14 @@ router.get('/preferences', ensureAuth, async (req: Request, res: Response) => {
  * PUT /api/notifications/preferences
  * Update user notification preferences
  */
-router.put('/preferences', ensureAuth, async (req: Request, res: Response) => {
+router.put('/preferences', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const {
       enablePush,
       enableTelegram,
@@ -261,15 +299,36 @@ router.put('/preferences', ensureAuth, async (req: Request, res: Response) => {
       mutedUsers,
     } = req.body;
 
-    await notificationService.updateUserPreferences(userId, {
-      userId,
-      enablePushNotifications: enablePush,
-      enableTelegramNotifications: enableTelegram,
-      enableInAppNotifications: enableInApp,
-      notificationFrequency,
-      mutedChallenges,
-      mutedUsers,
-    });
+    // Update or insert preferences
+    const existing = await db
+      .select()
+      .from(userNotificationPreferences)
+      .where(eq(userNotificationPreferences.userId, userId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db
+        .update(userNotificationPreferences)
+        .set({
+          enablePush: enablePush !== undefined ? enablePush : true,
+          enableTelegram: enableTelegram !== undefined ? enableTelegram : false,
+          enableInApp: enableInApp !== undefined ? enableInApp : true,
+          notificationFrequency: notificationFrequency || 'immediate',
+          mutedChallenges: mutedChallenges || [],
+          mutedUsers: mutedUsers || [],
+        })
+        .where(eq(userNotificationPreferences.userId, userId));
+    } else {
+      await db.insert(userNotificationPreferences).values({
+        userId,
+        enablePush: enablePush !== undefined ? enablePush : true,
+        enableTelegram: enableTelegram !== undefined ? enableTelegram : false,
+        enableInApp: enableInApp !== undefined ? enableInApp : true,
+        notificationFrequency: notificationFrequency || 'immediate',
+        mutedChallenges: mutedChallenges || [],
+        mutedUsers: mutedUsers || [],
+      });
+    }
 
     res.json({ success: true, message: 'Preferences updated' });
   } catch (error) {
@@ -282,10 +341,14 @@ router.put('/preferences', ensureAuth, async (req: Request, res: Response) => {
  * POST /api/notifications/mute-challenge/:challengeId
  * Mute notifications for a challenge
  */
-router.post('/mute-challenge/:challengeId', ensureAuth, async (req: Request, res: Response) => {
+router.post('/mute-challenge/:challengeId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const challengeId = req.params.challengeId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     const prefs = await db
       .select()
@@ -298,10 +361,17 @@ router.post('/mute-challenge/:challengeId', ensureAuth, async (req: Request, res
       mutedChallenges.push(challengeId);
     }
 
-    await notificationService.updateUserPreferences(userId, {
-      userId,
-      mutedChallenges,
-    });
+    if (prefs.length > 0) {
+      await db
+        .update(userNotificationPreferences)
+        .set({ mutedChallenges })
+        .where(eq(userNotificationPreferences.userId, userId));
+    } else {
+      await db.insert(userNotificationPreferences).values({
+        userId,
+        mutedChallenges,
+      });
+    }
 
     res.json({ success: true, message: 'Challenge muted' });
   } catch (error) {
@@ -314,10 +384,14 @@ router.post('/mute-challenge/:challengeId', ensureAuth, async (req: Request, res
  * POST /api/notifications/unmute-challenge/:challengeId
  * Unmute notifications for a challenge
  */
-router.post('/unmute-challenge/:challengeId', ensureAuth, async (req: Request, res: Response) => {
+router.post('/unmute-challenge/:challengeId', SupabaseAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const challengeId = req.params.challengeId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     const prefs = await db
       .select()
@@ -327,10 +401,17 @@ router.post('/unmute-challenge/:challengeId', ensureAuth, async (req: Request, r
 
     const mutedChallenges = (prefs[0]?.mutedChallenges || []).filter((id) => id !== challengeId);
 
-    await notificationService.updateUserPreferences(userId, {
-      userId,
-      mutedChallenges,
-    });
+    if (prefs.length > 0) {
+      await db
+        .update(userNotificationPreferences)
+        .set({ mutedChallenges })
+        .where(eq(userNotificationPreferences.userId, userId));
+    } else {
+      await db.insert(userNotificationPreferences).values({
+        userId,
+        mutedChallenges,
+      });
+    }
 
     res.json({ success: true, message: 'Challenge unmuted' });
   } catch (error) {

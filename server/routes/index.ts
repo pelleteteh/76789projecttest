@@ -11,6 +11,7 @@ import apiAdminDashboardRouter from './api-admin-dashboard';
 import apiUserRouter from './api-user';
 import apiFriendsRouter from './api-friends';
 import apiFollowersRouter from './api-followers';
+import notificationsRouter from './notificationsApi';
 
 export function registerBlockchainRoutes(app: express.Application) {
   /**
@@ -98,6 +99,16 @@ export function registerBlockchainRoutes(app: express.Application) {
    * GET /api/followers/status/:userId - Check if following status
    */
   app.use('/api/followers', apiFollowersRouter);
+
+  /**
+   * Notifications Management
+   * GET /api/notifications - Get user's notifications
+   * PATCH /api/notifications/:id/read - Mark notification as read
+   * DELETE /api/notifications/:id - Delete notification
+   * GET /api/notifications/unread-count - Get unread count
+   * PUT /api/notifications/preferences - Update notification preferences
+   */
+  app.use('/api/notifications', notificationsRouter);
 
   console.log('✅ Blockchain REST API routes registered:');
   console.log('   - /api/challenges');

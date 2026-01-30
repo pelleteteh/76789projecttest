@@ -3,6 +3,10 @@ import { PrivyClient } from '@privy-io/server-auth';
 const PRIVY_APP_ID = process.env.PRIVY_APP_ID;
 const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET;
 
+console.log('\n🔐 Privy Auth Module Loading...');
+console.log(`   PRIVY_APP_ID: ${PRIVY_APP_ID ? `✅ Set (${PRIVY_APP_ID.substring(0, 12)}...)` : '❌ MISSING'}`);
+console.log(`   PRIVY_APP_SECRET: ${PRIVY_APP_SECRET ? `✅ Set (${PRIVY_APP_SECRET.substring(0, 12)}...)` : '❌ MISSING'}`);
+
 if (!PRIVY_APP_ID) {
   console.error('❌ PRIVY_APP_ID not set in environment variables');
 }
@@ -24,12 +28,19 @@ if (PRIVY_APP_ID && PRIVY_APP_SECRET) {
 
 export async function verifyPrivyToken(token: string) {
   try {
-    console.debug(`🔍 Verifying Privy token (first 20 chars: ${token.substring(0, 20)}...)`);
+    console.log(`🔍 Starting Privy token verification...`);
+    console.log(`   Token length: ${token.length} chars`);
+    
     const verifiedClaims = await privyClient.verifyAuthToken(token);
-    console.debug(`✅ Token verified successfully`);
+    
+    console.log(`✅ Token verified successfully`);
+    console.log(`   Claims keys: ${Object.keys(verifiedClaims).join(', ')}`);
+    console.log(`   userId: ${verifiedClaims?.userId || verifiedClaims?.sub}`);
+    
     return verifiedClaims;
   } catch (error: any) {
     console.error('❌ Privy token verification failed:', error.message || error);
+    console.error('   Error details:', error?.response?.data || error);
     return null;
   }
 }
@@ -117,7 +128,9 @@ async function upsertPrivyUser(verifiedClaims: any) {
 
 export async function PrivyAuthMiddleware(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;
-  console.debug(`\n🔐 PrivyAuthMiddleware - Authorization header: ${authHeader ? 'Present' : 'Missing'}`);
+  const url = req.originalUrl || req.url;
+  console.log(`\n🔐 PrivyAuthMiddleware called for ${req.method} ${url}`);
+  console.log(`   Authorization header: ${authHeader ? 'Present' : 'MISSING'}`);
 
   // Allow Passport session as fallback if no Privy token provided
   if (!authHeader && req.isAuthenticated && req.isAuthenticated()) {
@@ -125,7 +138,7 @@ export async function PrivyAuthMiddleware(req: any, res: any, next: any) {
     try {
       const sessionUser = req.user;
       if (sessionUser) {
-        console.debug('✅ Using session-based auth fallback');
+        console.log('✅ Using session-based auth fallback');
         req.user = sessionUser;
         return next();
       }
@@ -136,24 +149,31 @@ export async function PrivyAuthMiddleware(req: any, res: any, next: any) {
   }
 
   if (!authHeader) {
-    console.error('❌ No Authorization header found');
-    return res.status(401).json({ message: 'Authorization header missing' });
+    console.error('❌ No Authorization header found for', url);
+    return res.status(401).json({ message: 'Authorization header missing', url });
   }
 
   const token = authHeader.replace('Bearer ', '');
-  console.debug(`🔑 Token (first 20 chars): ${token.substring(0, 20)}...`);
+  console.log(`🔑 Token received (first 30 chars): ${token.substring(0, 30)}...`);
 
   try {
+    console.log('⏳ Verifying Privy token...');
     const verifiedClaims = await verifyPrivyToken(token);
 
+    if (!verifiedClaims) {
+      console.error('❌ Token verification returned null');
+      return res.status(401).json({ message: 'Token verification failed' });
+    }
+
     const userId = verifiedClaims?.userId || verifiedClaims?.sub;
-    console.debug(`📝 Verified claims userId: ${userId}`);
+    console.log(`✅ Token verified! userId: ${userId}`);
     
-    if (!verifiedClaims || !userId) {
-      console.error('❌ Invalid token or user ID not found');
+    if (!userId) {
+      console.error('❌ No user ID found in verified claims', { keys: Object.keys(verifiedClaims) });
       return res.status(401).json({ message: 'Invalid token or user ID not found' });
     }
 
+    console.log('📝 Upserting user to database...');
     const dbUser = await upsertPrivyUser(verifiedClaims);
 
     if (!dbUser) {
@@ -161,7 +181,7 @@ export async function PrivyAuthMiddleware(req: any, res: any, next: any) {
       return res.status(500).json({ message: 'Failed to create or retrieve user' });
     }
 
-    console.debug(`✅ User authenticated: ${dbUser.id}`);
+    console.log(`✅ User authenticated and ready: ${dbUser.id}`);
 
     // Attach user to request with proper structure for routes
     // Privy auth structure - set both id and claims for compatibility
@@ -180,9 +200,10 @@ export async function PrivyAuthMiddleware(req: any, res: any, next: any) {
       }
     };
 
+    console.log(`🏃 Calling next() for authenticated user ${dbUser.id}`);
     next();
-  } catch (error) {
-    console.error('❌ Authentication error:', error);
-    res.status(500).json({ message: 'Internal server error during authentication' });
+  } catch (error: any) {
+    console.error('❌ Authentication error:', error?.message || error);
+    res.status(500).json({ message: 'Internal server error during authentication', error: error?.message });
   }
 }

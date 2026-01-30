@@ -264,6 +264,13 @@ router.post('/create-admin', PrivyAuthMiddleware, async (req: Request, res: Resp
 
     // Broadcast to Telegram (NO tags for admin challenges)
     try {
+      // Get the challenge from database to access coverImageUrl
+      const dbChallenge = await db
+        .select()
+        .from(challenges)
+        .where(eq(challenges.id, challengeId))
+        .limit(1);
+      
       await telegramBot.broadcastChallenge({
         id: challengeId,
         title,
@@ -274,6 +281,7 @@ router.post('/create-admin', PrivyAuthMiddleware, async (req: Request, res: Resp
         challengeType: 'admin',
         status: 'pending',
         isAdminChallenge: true, // No tags for admin challenges
+        coverImageUrl: dbChallenge[0]?.coverImageUrl || undefined,
       });
     } catch (err) {
       console.error('Failed to broadcast admin challenge to Telegram:', err);
@@ -450,6 +458,13 @@ router.post('/create-p2p', PrivyAuthMiddleware, upload.single('coverImage'), asy
 
     // Broadcast to Telegram
     try {
+      // Get the challenge from database to access coverImageUrl
+      const dbChallenge = await db
+        .select()
+        .from(challenges)
+        .where(eq(challenges.id, challengeId))
+        .limit(1);
+      
       await telegramBot.broadcastChallenge({
         id: challengeId,
         title,
@@ -463,6 +478,7 @@ router.post('/create-p2p', PrivyAuthMiddleware, upload.single('coverImage'), asy
         challengeType: isOpenChallenge ? 'open' : 'direct',
         status: 'pending',
         isAdminChallenge: false, // P2P challenges get tagged
+        coverImageUrl: dbChallenge[0]?.coverImageUrl || undefined,
       });
     } catch (err) {
       console.error('Failed to broadcast P2P challenge to Telegram:', err);
@@ -1173,14 +1189,15 @@ router.post('/:challengeId/accept-open', PrivyAuthMiddleware, async (req: Reques
     res.json({
       success: true,
       challengeId: parseInt(challengeId),
-      transactionHash: txResult.transactionHash,
-      blockNumber: txResult.blockNumber,
+      transactionHash: providedTxHash || 'pending_onchain',
+      blockNumber: null,
       status: 'active',
       title: challenge.title,
       challenger: challenge.challenger,
       challenged: userId,
       stakeAmount: challenge.amount,
       totalPool: challenge.amount * 2,
+      pointsAwarded: joiningPoints,
       message: `Challenge accepted! Both stakes are now locked on-chain.`,
     });
 

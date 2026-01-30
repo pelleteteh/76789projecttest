@@ -25,6 +25,7 @@ export default function Notifications() {
   const { data: notifications = [], isLoading, error } = useQuery({
     queryKey: ["/api/notifications"],
     retry: false,
+    enabled: !!user,
   });
 
   // Handle errors in useEffect

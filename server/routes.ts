@@ -2,9 +2,10 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { PrivyAuthMiddleware } from "./privyAuth";
+import { SupabaseAuthMiddleware } from "./supabaseAuth";
 import { setupOGImageRoutes } from "./ogImageGenerator";
 import ogMetadataRouter from './routes/og-metadata';
+import authRouter from './routes/api-auth';
 import { registerBlockchainRoutes } from './routes/index';
 import { initializeBlockchain } from './blockchain/init';
 
@@ -37,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Profile routes
-  app.get('/api/profile', PrivyAuthMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/profile', SupabaseAuthMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = getUserId(req);
       const user = await storage.getUser(userId);
@@ -46,6 +47,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch profile" });
     }
   });
+
+  // Update profile (PUT)
+  app.put('/api/profile', SupabaseAuthMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      const { firstName, lastName, username, bio, profileImageUrl } = req.body;
+
+      // Update user profile
+      const updated = await storage.updateUserProfile(userId, {
+        firstName: firstName !== undefined ? firstName : undefined,
+        lastName: lastName !== undefined ? lastName : undefined,
+        username: username !== undefined ? username : undefined,
+        bio: bio !== undefined ? bio : undefined,
+        profileImageUrl: profileImageUrl !== undefined ? profileImageUrl : undefined,
+      });
+
+      console.log(`✅ Profile updated for user ${userId}`);
+      res.json({
+        success: true,
+        message: 'Profile updated successfully',
+        ...updated,
+      });
+    } catch (error: any) {
+      console.error('❌ Error updating profile:', error);
+      res.status(500).json({ 
+        message: "Failed to update profile",
+        error: error?.message 
+      });
+    }
+  });
+
+  // Auth routes (Supabase wallet login)
+  app.use('/api/auth', authRouter);
 
   // Event routes
   app.get('/api/events', async (req, res) => {
@@ -80,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Authenticated users list (admin or authenticated use-cases)
-  app.get('/api/users', PrivyAuthMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/users', SupabaseAuthMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const allUsers = await storage.getAllUsersWithWallets();
       res.json(allUsers);
@@ -91,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Wallet routes
-  app.post('/api/wallet/deposit', PrivyAuthMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/wallet/deposit', SupabaseAuthMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = getUserId(req);
       const { amount } = req.body;

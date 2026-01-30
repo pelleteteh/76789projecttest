@@ -24,15 +24,36 @@ export function useAuth() {
       // Only update stable state after Privy is ready
       setStableAuthenticated(authenticated);
       
-      // If authenticated, we need to get a valid auth token
-      if (authenticated) {
+      // If authenticated, exchange Privy wallet for Supabase JWT
+      if (authenticated && user?.wallet?.address) {
         (async () => {
           try {
-            // Use getAccessToken which returns a valid JWT for the API
-            const token = await getAccessToken();
-            if (token) {
-              setAuthToken(token);
-              console.log('✅ Privy auth token set for API requests');
+            console.log('🔄 Exchanging Privy wallet for Supabase JWT...');
+            console.log(`   Wallet: ${user.wallet.address}`);
+            
+            // Exchange wallet login for Supabase JWT token
+            const response = await fetch('/api/auth/wallet-login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                walletAddress: user.wallet.address,
+                email: user.email,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error(`Login failed: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const supabaseToken = data.token;
+
+            if (supabaseToken) {
+              setAuthToken(supabaseToken);
+              console.log('✅ Supabase JWT token set for API requests');
+              console.log(`   Token (first 40 chars): ${supabaseToken.substring(0, 40)}...`);
 
               // Check for stored referral code and report it to the backend
               const storedReferralCode = localStorage.getItem("referralCode");
@@ -42,7 +63,7 @@ export function useAuth() {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`
+                      'Authorization': `Bearer ${supabaseToken}`
                     },
                     body: JSON.stringify({ referralCode: storedReferralCode })
                   });
@@ -56,20 +77,21 @@ export function useAuth() {
                 }
               }
             } else {
-              console.warn('⚠️ getAccessToken returned null/undefined');
+              console.warn('⚠️ No token returned from wallet login');
               setAuthToken(null);
             }
           } catch (err) {
-            console.error('Failed to get Privy access token:', err);
+            console.error('❌ Failed to exchange wallet for JWT:', err);
             setAuthToken(null);
           }
         })();
       } else {
         // Clear token when logged out
+        console.log('👋 User logged out, clearing auth token');
         setAuthToken(null);
       }
     }
-  }, [authenticated, ready, getAccessToken]);
+  }, [authenticated, ready, user?.wallet?.address, user?.email]);
 
   const logout = async () => {
     try {

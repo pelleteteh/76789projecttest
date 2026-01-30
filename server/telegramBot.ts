@@ -18,6 +18,7 @@ interface ChallengeMessage {
   status: string;
   expirationHours?: number;
   isAdminChallenge?: boolean;
+  coverImageUrl?: string;
 }
 
 class TelegramBot {
@@ -41,27 +42,57 @@ class TelegramBot {
    */
   private formatChallengeMessage(challenge: ChallengeMessage): string {
     const appUrl = process.env.APP_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-    const challengeLink = `${appUrl}/challenges/${challenge.id}/activity`;
-    const joinLink = challenge.challengeType === 'open' ? `${appUrl}/challenges` : challengeLink;
+    const challengeLink = `${appUrl}/challenges/${challenge.id}`;
+    const acceptLink = challenge.challengeType === 'open' ? challengeLink : challengeLink;
 
-    const baseInfo = `
-🎯 <b>New Challenge: ${challenge.title}</b>
-
-💰 <b>Amount:</b> $${challenge.amount.toFixed(2)}
-🏷️ <b>Category:</b> ${challenge.category || 'General'}
-📝 <b>Type:</b> ${challenge.challengeType === 'admin' ? 'Betting Pool' : challenge.challengeType === 'direct' ? 'Direct Challenge' : 'Open Challenge'}
-⏱️ <b>Expires in:</b> ${challenge.expirationHours || 24} hours
-${challenge.description ? `\n📄 <b>Details:</b> ${challenge.description}` : ''}
-
-🔗 <a href="${joinLink}">Click here to JOIN this challenge!</a>
-`;
-
-    // Only add tags for P2P challenges, NOT for admin challenges
-    if (!challenge.isAdminChallenge && challenge.creator.username) {
-      return `${baseInfo}\n👤 <b>Created by:</b> @${challenge.creator.username}`;
+    let messageContent = ``;
+    
+    // Header based on challenge type
+    if (challenge.challengeType === 'admin') {
+      messageContent += `🏆 <b>NEW CHALLENGE</b>\n\n`;
+    } else if (challenge.challengeType === 'direct') {
+      messageContent += `⚔️ <b>NEW P2P CHALLENGE</b>\n\n`;
+    } else {
+      messageContent += `🔓 <b>NEW OPEN CHALLENGE</b>\n\n`;
     }
+    
+    messageContent += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    messageContent += `📎 <b>${challenge.title}</b>\n`;
+    messageContent += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    if (challenge.description) {
+      messageContent += `💭 <b>Description:</b> ${challenge.description}\n\n`;
+    }
+    
+    // Show challenger info for P2P challenges
+    if (!challenge.isAdminChallenge && challenge.creator?.username) {
+      messageContent += `🚀 <b>Created by:</b> @${challenge.creator.username}\n`;
+    }
+    
+    // Show challenged user for direct challenges
+    if (challenge.challengeType === 'direct' && challenge.creator?.username) {
+      messageContent += `🎯 <b>Challenging:</b> [Direct Challenge - Awaiting Response]\n`;
+    }
+    
+    // Show open challenge info
+    if (challenge.challengeType === 'open') {
+      messageContent += `🎯 <b>Challenge Type:</b> Open to Anyone\n`;
+      messageContent += `⏳ <b>Status:</b> Waiting for Opponent\n`;
+    }
+    
+    messageContent += `💰 <b>Stake Amount:</b> $${challenge.amount.toFixed(2)}\n`;
+    messageContent += `🏷️ <b>Category:</b> ${challenge.category || 'General'}\n`;
+    messageContent += `⏱️ <b>Expires in:</b> ${challenge.expirationHours || 24} hours\n\n`;
+    
+    messageContent += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    messageContent += `🎯 <a href="${acceptLink}"><b>VIEW & ${challenge.challengeType === 'open' ? 'ACCEPT' : 'RESPOND'} CHALLENGE</b></a>\n`;
+    messageContent += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    // Add hashtags
+    const hashtags = ['#BantahChallenge', `#${(challenge.category || 'General').replace(/\s+/g, '')}`, '#Join'];
+    messageContent += hashtags.join(' ');
 
-    return baseInfo;
+    return messageContent;
   }
 
   /**
@@ -80,7 +111,11 @@ ${challenge.description ? `\n📄 <b>Details:</b> ${challenge.description}` : ''
       // Send to channel if configured
       if (this.channelId) {
         try {
-          await this.sendMessage(this.channelId, message);
+          if (challenge.coverImageUrl) {
+            await this.sendPhotoMessage(this.channelId, challenge.coverImageUrl, message);
+          } else {
+            await this.sendMessage(this.channelId, message);
+          }
           console.log(`✅ Broadcast sent to channel: ${this.channelId}`);
         } catch (channelError) {
           console.error(`❌ Failed to broadcast to channel ${this.channelId}:`, channelError);
@@ -90,7 +125,11 @@ ${challenge.description ? `\n📄 <b>Details:</b> ${challenge.description}` : ''
       // Send to group if configured and not already sent to same ID
       if (this.groupId && this.groupId !== this.channelId) {
         try {
-          await this.sendMessage(this.groupId, message);
+          if (challenge.coverImageUrl) {
+            await this.sendPhotoMessage(this.groupId, challenge.coverImageUrl, message);
+          } else {
+            await this.sendMessage(this.groupId, message);
+          }
           console.log(`✅ Broadcast sent to group: ${this.groupId}`);
         } catch (groupError) {
           console.error(`❌ Failed to broadcast to group ${this.groupId}:`, groupError);
@@ -102,6 +141,45 @@ ${challenge.description ? `\n📄 <b>Details:</b> ${challenge.description}` : ''
     } catch (error) {
       console.error('❌ Failed to broadcast challenge to Telegram:', error);
       return false;
+    }
+  }
+
+  /**
+   * Send a photo message with caption to Telegram chat
+   */
+  private async sendPhotoMessage(chatId: string, photoUrl: string, caption: string): Promise<void> {
+    try {
+      console.log(`📤 Sending photo message to Telegram chat: ${chatId}`);
+      const response = await fetch(`https://api.telegram.org/bot${this.token}/sendPhoto`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          photo: photoUrl,
+          caption: caption,
+          parse_mode: 'HTML',
+          disable_web_page_preview: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error(`❌ Telegram API error for chat ${chatId}:`, error);
+        // Fallback to text message if photo fails
+        console.log(`⚠️  Falling back to text message...`);
+        await this.sendMessage(chatId, caption);
+        return;
+      }
+
+      const result = await response.json();
+      console.log(`✅ Photo message sent successfully to ${chatId}: message_id=${result.result.message_id}`);
+    } catch (error) {
+      console.error(`❌ Error sending photo message to Telegram chat ${chatId}:`, error);
+      // Fallback to text message if photo fails
+      console.log(`⚠️  Falling back to text message...`);
+      await this.sendMessage(chatId, caption);
     }
   }
 
