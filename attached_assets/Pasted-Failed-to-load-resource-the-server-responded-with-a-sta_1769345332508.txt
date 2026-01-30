@@ -1,0 +1,34 @@
+Failed to load resource: the server responded with a status of 401 (Unauthorized)Understand this error
+queryClient.ts:112 Query Function Error: Error: 401: {"message":"Authentication required"}
+queryFn @ queryClient.ts:112Understand this error
+@radix-ui_react-dialog.js?v=270588e4:438 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ @radix-ui_react-dialog.js?v=270588e4:438Understand this warning
+useBlockchainChallenge.ts:171 🔍 Checking user object: Object
+useBlockchainChallenge.ts:172 🔍 User wallet: Object
+useBlockchainChallenge.ts:173 🔍 Wallets array: undefined
+useBlockchainChallenge.ts:174 🔍 Privy ready: true
+useBlockchainChallenge.ts:186 🔍 Using connected external wallet from user.wallet
+useBlockchainChallenge.ts:211 🔍 Selected wallet: Object
+useBlockchainChallenge.ts:241 🔗 Creating P2P challenge from 0x3853EE0476061220848d9D1990F5dccd286a7281...
+useBlockchainChallenge.ts:242 📋 Contract address: 0xcE1D04A1830035Aa117A910f285818FF1AFca621
+useBlockchainChallenge.ts:339 Failed to create P2P challenge on-chain: Error: Opponent address is not a valid wallet address: did:privy:cm5wyksqh00u1xt3yo3mj0231. You may need to select a friend with a connected wallet.
+    at createP2PChallenge (useBlockchainChallenge.ts:264:15)
+    at async Object.mutationFn (Challenges.tsx:309:24)
+createP2PChallenge @ useBlockchainChallenge.ts:339Understand this error
+chunk-SATAD66D.js?v=270588e4:10577 App configuration has Solana wallet login enabled, but no Solana wallet connectors have been passed to Privy. Make sure to pass Solana connectors to the `config.externalWallets.solana.connectors` field of the `PrivyProvider`
+ae @ chunk-SATAD66D.js?v=270588e4:10577
+(anonymous) @ chunk-SATAD66D.js?v=270588e4:10584
+updateMemo @ chunk-SM3OW2QE.js?v=270588e4:12210
+useMemo @ chunk-SM3OW2QE.js?v=270588e4:12726
+useMemo @ chunk-7SNDHR3H.js?v=270588e4:1094
+re @ chunk-SATAD66D.js?v=270588e4:10584
+renderWithHooks @ chunk-SM3OW2QE.js?v=270588e4:11548
+updateFunctionComponent @ chunk-SM3OW2QE.js?v=270588e4:14582
+beginWork @ chunk-SM3OW2QE.js?v=270588e4:15924
+beginWork$1 @ chunk-SM3OW2QE.js?v=270588e4:19753
+performUnitOfWork @ chunk-SM3OW2QE.js?v=270588e4:19198
+workLoopSync @ chunk-SM3OW2QE.js?v=270588e4:19137
+renderRootSync @ chunk-SM3OW2QE.js?v=270588e4:19116
+performSyncWorkOnRoot @ chunk-SM3OW2QE.js?v=270588e4:18874
+flushSyncCallbacks @ chunk-SM3OW2QE.js?v=270588e4:9119
+(anonymous) @ chunk-SM3OW2QE.js?v=270588e4:18627Understand this warning

@@ -1,0 +1,36 @@
+queryClient.ts:61 API Request Error: Error: 500: {"error":"Challenge acceptance failed","message":"contract runner does not support sending transactions (operation=\"sendTransaction\", code=UNSUPPORTED_OPERATION, version=6.16.0)","details":"contract runner does not support sending transactions (operation=\"sendTransaction\", code=UNSUPPORTED_OPERATION, version=6.16.0)"}
+apiRequest	@	queryClient.ts:61
+await in apiRequest		
+mutationFn	@	ChallengeCard.tsx:250
+fn	@	@tanstack_react-query.js?v=bb4ac9ab:2029
+run	@	@tanstack_react-query.js?v=bb4ac9ab:822
+start	@	@tanstack_react-query.js?v=bb4ac9ab:865
+execute	@	@tanstack_react-query.js?v=bb4ac9ab:2071
+await in execute		
+mutate	@	@tanstack_react-query.js?v=bb4ac9ab:2423
+(anonymous)	@	@tanstack_react-query.js?v=bb4ac9ab:3658
+onClick	@	ChallengeCard.tsx:858
+callCallback2	@	chunk-SM3OW2QE.js?v=bb4ac9ab:3674
+invokeGuardedCallbackDev	@	chunk-SM3OW2QE.js?v=bb4ac9ab:3699
+invokeGuardedCallback	@	chunk-SM3OW2QE.js?v=bb4ac9ab:3733
+invokeGuardedCallbackAndCatchFirstError	@	chunk-SM3OW2QE.js?v=bb4ac9ab:3736
+executeDispatch	@	chunk-SM3OW2QE.js?v=bb4ac9ab:7014
+processDispatchQueueItemsInOrder	@	chunk-SM3OW2QE.js?v=bb4ac9ab:7034
+processDispatchQueue	@	chunk-SM3OW2QE.js?v=bb4ac9ab:7043
+dispatchEventsForPlugins	@	chunk-SM3OW2QE.js?v=bb4ac9ab:7051
+(anonymous)	@	chunk-SM3OW2QE.js?v=bb4ac9ab:7174
+batchedUpdates$1	@	chunk-SM3OW2QE.js?v=bb4ac9ab:18913
+batchedUpdates	@	chunk-SM3OW2QE.js?v=bb4ac9ab:3579
+dispatchEventForPluginEventSystem	@	chunk-SM3OW2QE.js?v=bb4ac9ab:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay	@	chunk-SM3OW2QE.js?v=bb4ac9ab:5478
+dispatchEvent	@	chunk-SM3OW2QE.js?v=bb4ac9ab:5472
+dispatchDiscreteEvent	@	chunk-SM3OW2QE.js?v=bb4ac9ab:5449
+
+utils.ts:51 ⚠️ Unknown token address: 0x036cbd53842c5426634e7929541ec2318f3dcf7e
+utils.ts:51 ⚠️ Unknown token address: 0x036cbd53842c5426634e7929541ec2318f3dcf7e
+utils.ts:51 ⚠️ Unknown token address: 0x036cbd53842c5426634e7929541ec2318f3dcf7e
+utils.ts:51 ⚠️ Unknown token address: 0x036cbd53842c5426634e7929541ec2318f3dcf7e
+utils.ts:51 ⚠️ Unknown token address: 0x036cbd53842c5426634e7929541ec2318f3dcf7e
+utils.ts:51 ⚠️ Unknown token address: 0x036cbd53842c5426634e7929541ec2318f3dcf7e
+﻿
+

@@ -1,0 +1,57 @@
+ 
+ POST https://7b6bb72a-bcba-4242-b598-5dbc765f9550-00-2c9nwd14osyks.worf.replit.dev/api/challenges/create-p2p 500 (Internal Server Error)
+apiRequest	@	/src/lib/queryClient.ts:33
+mutationFn	@	/src/pages/Challenges.tsx:239
+fn	@	/@fs/home/runner/wor….js?v=ca17ce10:2029
+run	@	/@fs/home/runner/wor…y.js?v=ca17ce10:822
+start	@	/@fs/home/runner/wor…y.js?v=ca17ce10:865
+execute	@	/@fs/home/runner/wor….js?v=ca17ce10:2070
+await in execute		
+mutate	@	/@fs/home/runner/wor….js?v=ca17ce10:2422
+(anonymous)	@	/@fs/home/runner/wor….js?v=ca17ce10:3648
+onClick	@	/src/pages/Challenges.tsx:1061
+callCallback2	@	/@fs/home/runner/wor….js?v=ca17ce10:3674
+invokeGuardedCallbackDev	@	/@fs/home/runner/wor….js?v=ca17ce10:3699
+invokeGuardedCallback	@	/@fs/home/runner/wor….js?v=ca17ce10:3733
+invokeGuardedCallbackAndCatchFirstError	@	/@fs/home/runner/wor….js?v=ca17ce10:3736
+executeDispatch	@	/@fs/home/runner/wor….js?v=ca17ce10:7014
+processDispatchQueueItemsInOrder	@	/@fs/home/runner/wor….js?v=ca17ce10:7034
+processDispatchQueue	@	/@fs/home/runner/wor….js?v=ca17ce10:7043
+dispatchEventsForPlugins	@	/@fs/home/runner/wor….js?v=ca17ce10:7051
+(anonymous)	@	/@fs/home/runner/wor….js?v=ca17ce10:7174
+batchedUpdates$1	@	/@fs/home/runner/wor…js?v=ca17ce10:18913
+batchedUpdates	@	/@fs/home/runner/wor….js?v=ca17ce10:3579
+dispatchEventForPluginEventSystem	@	/@fs/home/runner/wor….js?v=ca17ce10:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay	@	/@fs/home/runner/wor….js?v=ca17ce10:5478
+dispatchEvent	@	/@fs/home/runner/wor….js?v=ca17ce10:5472
+dispatchDiscreteEvent	@	/@fs/home/runner/wor….js?v=ca17ce10:5449
+ API Request Error: Error: 500: {"error":"Failed to create P2P challenge","message":"ethers is not defined"}
+apiRequest	@	/src/lib/queryClient.ts:44
+await in apiRequest		
+mutationFn	@	/src/pages/Challenges.tsx:239
+fn	@	/@fs/home/runner/wor….js?v=ca17ce10:2029
+run	@	/@fs/home/runner/wor…y.js?v=ca17ce10:822
+start	@	/@fs/home/runner/wor…y.js?v=ca17ce10:865
+execute	@	/@fs/home/runner/wor….js?v=ca17ce10:2070
+await in execute		
+mutate	@	/@fs/home/runner/wor….js?v=ca17ce10:2422
+(anonymous)	@	/@fs/home/runner/wor….js?v=ca17ce10:3648
+onClick	@	/src/pages/Challenges.tsx:1061
+callCallback2	@	/@fs/home/runner/wor….js?v=ca17ce10:3674
+invokeGuardedCallbackDev	@	/@fs/home/runner/wor….js?v=ca17ce10:3699
+invokeGuardedCallback	@	/@fs/home/runner/wor….js?v=ca17ce10:3733
+invokeGuardedCallbackAndCatchFirstError	@	/@fs/home/runner/wor….js?v=ca17ce10:3736
+executeDispatch	@	/@fs/home/runner/wor….js?v=ca17ce10:7014
+processDispatchQueueItemsInOrder	@	/@fs/home/runner/wor….js?v=ca17ce10:7034
+processDispatchQueue	@	/@fs/home/runner/wor….js?v=ca17ce10:7043
+dispatchEventsForPlugins	@	/@fs/home/runner/wor….js?v=ca17ce10:7051
+(anonymous)	@	/@fs/home/runner/wor….js?v=ca17ce10:7174
+batchedUpdates$1	@	/@fs/home/runner/wor…js?v=ca17ce10:18913
+batchedUpdates	@	/@fs/home/runner/wor….js?v=ca17ce10:3579
+dispatchEventForPluginEventSystem	@	/@fs/home/runner/wor….js?v=ca17ce10:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay	@	/@fs/home/runner/wor….js?v=ca17ce10:5478
+dispatchEvent	@	/@fs/home/runner/wor….js?v=ca17ce10:5472
+dispatchDiscreteEvent	@	/@fs/home/runner/wor….js?v=ca17ce10:5449
+
+﻿
+

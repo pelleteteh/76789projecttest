@@ -1,0 +1,72 @@
+/**
+ * Integration Instructions for Phase 4 API Routes
+ * 
+ * Add these imports and function calls to your main server/index.ts file:
+ * 
+ * ============================================================
+ * STEP 1: Add imports at the top
+ * ============================================================
+ * 
+ * import { registerBlockchainRoutes } from './routes';
+ * 
+ * ============================================================
+ * STEP 2: Call the registration function after app setup
+ * ============================================================
+ * 
+ * // Initialize blockchain if not already done
+ * if (!process.env.BLOCKCHAIN_DISABLED) {
+ *   try {
+ *     await initBlockchainClient();
+ *     console.log('✅ Blockchain client initialized');
+ *   } catch (error) {
+ *     console.error('❌ Blockchain initialization failed:', error);
+ *     // Can continue without blockchain if disabled
+ *   }
+ * }
+ * 
+ * // Register all blockchain REST API routes
+ * registerBlockchainRoutes(app);
+ * 
+ * ============================================================
+ * STEP 3: Environment Variables Required
+ * ============================================================
+ * 
+ * Required in .env:
+ * - BLOCKCHAIN_RPC_URL=https://sepolia.base.org
+ * - BLOCKCHAIN_CHAIN_ID=84532
+ * - ADMIN_PRIVATE_KEY=your_admin_private_key
+ * - CONTRACT_POINTS_ADDRESS=0x...
+ * - CONTRACT_FACTORY_ADDRESS=0x...
+ * - CONTRACT_ESCROW_ADDRESS=0x...
+ * - PAYMASTER_ADDRESS=0x... (for gas sponsorship)
+ * - DATABASE_URL=your_postgres_url
+ * 
+ * ============================================================
+ * STEP 4: Verify Routes are Registered
+ * ============================================================
+ * 
+ * After starting the server, test with:
+ * 
+ * // Test Challenge endpoints
+ * curl http://localhost:3000/api/challenges
+ * 
+ * // Test Leaderboard
+ * curl http://localhost:3000/api/points/leaderboard
+ * 
+ * // Test Admin pending challenges (requires auth)
+ * curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/admin/challenges/pending
+ * 
+ * ============================================================
+ * STEP 5: Frontend Integration Ready
+ * ============================================================
+ * 
+ * All endpoints are now available at:
+ * - /api/challenges/*
+ * - /api/payouts/*
+ * - /api/points/*
+ * - /api/admin/challenges/*
+ * 
+ * Start Phase 5 for frontend component updates to use these endpoints.
+ */
+
+export {};

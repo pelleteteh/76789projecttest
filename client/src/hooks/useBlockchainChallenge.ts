@@ -1,0 +1,709 @@
+import { usePrivy } from '@privy-io/react-auth';
+import { useToast } from '@/hooks/use-toast';
+import { useChain } from '@/hooks/useChain';
+import { ethers } from 'ethers';
+import { useState, useEffect } from 'react';
+
+const ERC20_ABI = [
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+];
+
+const CHALLENGE_FACTORY_ABI = [
+  'function createP2PChallenge(address participant, address paymentToken, uint256 stakeAmount, uint256 pointsReward, string calldata metadataURI) returns (uint256)',
+  'function acceptP2PChallenge(uint256 challengeId)',
+];
+
+interface CreateP2PChallengeParams {
+  opponentAddress: string;
+  stakeAmount: string; // in wei
+  paymentToken: string;
+  pointsReward: string;
+  metadataURI: string;
+}
+
+interface AcceptChallengeParams {
+  challengeId: number;
+  stakeAmount: string; // in wei
+  paymentToken: string;
+  pointsReward: string;
+}
+
+interface TransactionResult {
+  transactionHash: string;
+  blockNumber: number;
+  status: 'success';
+}
+
+/**
+ * Hook for user-initiated blockchain challenge operations
+ * Handles signing and submitting transactions via Privy wallet
+ */
+export function useBlockchainChallenge() {
+  const { user, ready, wallets } = usePrivy() as any;
+  const { toast } = useToast();
+  const { setChainId: setAppChainId } = useChain();
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [currentChainId, setCurrentChainId] = useState<number>(84532); // Default to Base Sepolia
+
+  // Chain configurations
+  const CHAIN_CONFIGS: Record<number, any> = {
+    84532: {
+      name: 'Base Sepolia',
+      rpc: 'https://sepolia.base.org',
+      factoryAddress: import.meta.env.VITE_BASE_CHALLENGE_FACTORY_ADDRESS || import.meta.env.VITE_CHALLENGE_FACTORY_ADDRESS || '',
+      nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+      blockExplorer: 'https://sepolia.basescan.org',
+    },
+    80002: {
+      name: 'Polygon Amoy',
+      rpc: 'https://rpc-amoy.polygon.technology',
+      factoryAddress: import.meta.env.VITE_POLYGON_CHALLENGE_FACTORY_ADDRESS || '',
+      nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+      blockExplorer: 'https://amoy.polygonscan.com',
+    },
+    421614: {
+      name: 'Arbitrum Sepolia',
+      rpc: 'https://sepolia-rollup.arbitrum.io/rpc',
+      factoryAddress: import.meta.env.VITE_ARBITRUM_CHALLENGE_FACTORY_ADDRESS || '',
+      nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+      blockExplorer: 'https://sepolia.arbiscan.io',
+    },
+  };
+
+  // Listen to wallet chain changes and update app state
+  useEffect(() => {
+    const ethProvider = (window as any).ethereum;
+    if (!ethProvider) return;
+
+    const handleChainChanged = (chainIdHex: string) => {
+      const newChainId = parseInt(chainIdHex, 16);
+      console.log(`🔗 Wallet chain changed to: ${newChainId}`);
+      setCurrentChainId(newChainId);
+      setAppChainId(newChainId as any);
+      
+      // Show a subtle notification
+      const chainConfig = CHAIN_CONFIGS[newChainId];
+      if (chainConfig) {
+        toast({
+          title: '🔗 Wallet Network Changed',
+          description: `Switched to ${chainConfig.name}`,
+        });
+      }
+    };
+
+    // Listen for chain change events
+    ethProvider.on('chainChanged', handleChainChanged);
+
+    // Cleanup
+    return () => {
+      ethProvider.removeListener('chainChanged', handleChainChanged);
+    };
+  }, []);
+
+  const FACTORY_ADDRESS = CHAIN_CONFIGS[currentChainId]?.factoryAddress || '';
+  const RPC_URL = CHAIN_CONFIGS[currentChainId]?.rpc || 'https://sepolia.base.org';
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+
+  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  /**
+   * Switch wallet to specified chain
+   * Supports: Base Sepolia (84532), Polygon Amoy (80002), Arbitrum Sepolia (421614)
+   */
+  const switchChain = async (targetChainId: number): Promise<void> => {
+    const chainConfig = CHAIN_CONFIGS[targetChainId];
+    if (!chainConfig) {
+      throw new Error(`Unsupported chain ID: ${targetChainId}`);
+    }
+
+    const chainIdHex = '0x' + targetChainId.toString(16);
+    
+    try {
+      console.log(`🔄 SWITCHING WALLET TO ${chainConfig.name} (Chain ID: ${targetChainId})...`);
+
+      // Get the wallet
+      let wallet = null;
+      
+      if (user?.wallet) {
+        console.log('🔍 Using connected external wallet from user.wallet');
+        wallet = user.wallet;
+      } else if (wallets && wallets.length > 0) {
+        console.log('🔍 Using wallets array (embedded wallets)');
+        const embeddedWallet = (wallets as any[]).find((w: any) => w.walletClientType === 'privy');
+        wallet = embeddedWallet || wallets[0];
+      }
+
+      if (!wallet) {
+        throw new Error('No wallet available. Please connect your wallet first.');
+      }
+
+      let ethProvider = null;
+
+      // Get the correct provider based on wallet type
+      if (wallet.walletClientType === 'privy') {
+        // For Privy embedded wallet, use the wallet's provider
+        ethProvider = (wallet as any).provider;
+        console.log('📱 Using Privy embedded wallet provider...');
+      } else {
+        // For external wallets, try window.ethereum first
+        ethProvider = (window as any).ethereum;
+        console.log('📱 Using external wallet provider (window.ethereum)...');
+      }
+
+      if (!ethProvider) {
+        throw new Error('No Web3 wallet detected. Please install MetaMask or connect a wallet.');
+      }
+
+      console.log(`📱 Wallet provider found, sending switch request to wallet...`);
+
+      try {
+        const result = await ethProvider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainIdHex }],
+        });
+        console.log(`✅ Successfully switched to ${chainConfig.name}! Result:`, result);
+        
+        // Verify the switch worked by checking the current chain
+        const currentChainIdResult = await ethProvider.request({
+          method: 'eth_chainId',
+        });
+        console.log(`✅ Verified current chain ID: ${currentChainIdResult}`);
+        
+        // Update app state
+        setCurrentChainId(targetChainId);
+        
+        // Show success toast
+        toast({
+          title: '✅ Network Switched',
+          description: `Connected to ${chainConfig.name}`,
+        });
+        
+      } catch (switchError: any) {
+        console.log(`⚠️ Switch error code: ${switchError.code}`);
+        
+        if (switchError.code === 4902) {
+          console.log(`🔗 ${chainConfig.name} not found in wallet, adding it...`);
+          
+          const addResult = await ethProvider.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: chainIdHex,
+                chainName: chainConfig.name,
+                rpcUrls: [chainConfig.rpc],
+                nativeCurrency: chainConfig.nativeCurrency,
+                blockExplorerUrls: [chainConfig.blockExplorer],
+              },
+            ],
+          });
+          
+          console.log(`✅ Successfully added ${chainConfig.name} to wallet! Result:`, addResult);
+          
+          // Now try to switch again
+          console.log(`🔄 Now switching to newly added ${chainConfig.name}...`);
+          const switchResult = await ethProvider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: chainIdHex }],
+          });
+          console.log(`✅ Successfully switched to ${chainConfig.name}!`);
+          
+          setCurrentChainId(targetChainId);
+          
+          toast({
+            title: '✅ Network Added & Switched',
+            description: `Connected to ${chainConfig.name}`,
+          });
+          
+        } else if (switchError.code === 4001) {
+          throw new Error('You rejected the network switch request. Please approve to continue.');
+        } else {
+          throw switchError;
+        }
+      }
+      
+    } catch (error: any) {
+      console.error('❌ FAILED TO SWITCH NETWORK:', error);
+      toast({
+        title: '🚨 Network Switch Failed',
+        description: error.message || `Please switch your wallet to ${chainConfig.name} (Chain ID: ${targetChainId})`,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  /**
+   * Legacy function name for backward compatibility
+   */
+  const switchToBaseSepolia = async (): Promise<void> => {
+    return switchChain(84532);
+  };
+
+  /**
+   * Retry logic for failed transactions
+   */
+  const retryTransaction = async (
+    fn: () => Promise<TransactionResult>,
+    operationName: string
+  ): Promise<TransactionResult> => {
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`🔄 ${operationName} attempt ${attempt}/${MAX_RETRIES}`);
+        const result = await fn();
+        return result;
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Attempt ${attempt} failed:`, error.message);
+
+        // Don't retry on user cancellation
+        if (error.message?.includes('user rejected') || 
+            error.message?.includes('User denied') ||
+            error.code === 'ACTION_REJECTED') {
+          console.log('⚠️ User cancelled transaction, not retrying');
+          throw error;
+        }
+
+        // On last attempt, throw the error
+        if (attempt === MAX_RETRIES) {
+          console.error(`❌ All ${MAX_RETRIES} attempts failed`);
+          throw error;
+        }
+
+        // Wait before retrying
+        console.log(`⏳ Waiting ${RETRY_DELAY}ms before retry...`);
+        await wait(RETRY_DELAY);
+      }
+    }
+
+    throw lastError;
+  };
+
+  /**
+   * Create a P2P challenge and submit to blockchain
+   */
+  const createP2PChallenge = async (params: CreateP2PChallengeParams): Promise<TransactionResult> => {
+    try {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🔍 Checking user object:', user);
+      console.log('🔍 User wallet:', user?.wallet);
+      console.log('🔍 Wallets array:', wallets);
+      console.log('🔍 Privy ready:', ready);
+
+      // Check if Privy is ready
+      if (!ready) {
+        throw new Error('Privy is not ready. Please wait for initialization.');
+      }
+
+      // In Privy v3, prioritize the connected wallet from user.wallet
+      let wallet = null;
+
+      // First try user.wallet (for connected external wallets like Rainbow, MetaMask, etc.)
+      if (user?.wallet) {
+        console.log('🔍 Using connected external wallet from user.wallet');
+        wallet = user.wallet;
+      }
+      // Fallback to wallets array (for embedded wallets)
+      else if (wallets && wallets.length > 0) {
+        console.log('🔍 Using wallets array (embedded wallets)');
+        const embeddedWallet = (wallets as any[]).find((w: any) => w.walletClientType === 'privy');
+        if (embeddedWallet) {
+          wallet = embeddedWallet;
+          console.log('🔍 Found embedded wallet:', wallet);
+        } else {
+          // Use any available wallet
+          wallet = wallets[0];
+          console.log('🔍 Using first available wallet:', wallet);
+        }
+      }
+
+      if (!wallet) {
+        throw new Error('No wallet available. Please connect your wallet first.');
+      }
+
+      if (!wallet) {
+        throw new Error('No wallet available. Please connect your wallet first.');
+      }
+
+      console.log('🔍 Selected wallet:', wallet);
+
+      // Access the provider based on wallet type
+      let provider = null;
+
+      if (wallet.walletClientType === 'privy') {
+        // Embedded Privy wallet
+        provider = new ethers.BrowserProvider((wallet as any).provider as any);
+      } else {
+        // External wallet (Rainbow, MetaMask, etc.)
+        // For external wallets, we need to get the provider differently
+        if ((window as any).ethereum) {
+          provider = new ethers.BrowserProvider((window as any).ethereum);
+        } else {
+          throw new Error('No Ethereum provider available. Please install a Web3 wallet like MetaMask.');
+        }
+      }
+
+      if (!provider) {
+        throw new Error('Ethereum provider not available');
+      }
+
+      // Get the signer from the provider
+      const signer = await provider.getSigner();
+      if (!signer) {
+        throw new Error('Failed to get signer from wallet');
+      }
+
+      const userAddress = await signer.getAddress();
+
+      console.log(`🔗 Creating P2P challenge from ${userAddress}...`);
+      console.log(`📋 Contract address: ${FACTORY_ADDRESS}`);
+
+      // Validate contract address
+      if (!FACTORY_ADDRESS || FACTORY_ADDRESS === 'null' || FACTORY_ADDRESS === 'undefined') {
+        throw new Error(`Invalid contract address: ${FACTORY_ADDRESS}. Please check VITE_CHALLENGE_FACTORY_ADDRESS environment variable.`);
+      }
+
+      // Create contract instance with user's signer
+      const contract = new ethers.Contract(
+        FACTORY_ADDRESS,
+        CHALLENGE_FACTORY_ABI,
+        signer
+      );
+
+      // Validate opponent address
+      if (!params.opponentAddress || params.opponentAddress === 'null' || params.opponentAddress === 'undefined') {
+        throw new Error('Invalid opponent address. Please select a valid opponent with a connected wallet.');
+      }
+
+      // Check if opponent address is a valid Ethereum address or a user ID
+      const isValidAddress = /^0x[a-fA-F0-9]{40}$/.test(params.opponentAddress);
+      if (!isValidAddress) {
+        throw new Error(`Opponent address is not a valid wallet address: ${params.opponentAddress}. You may need to select a friend with a connected wallet.`);
+      }
+
+      // Convert amounts to BigInt
+      const stakeWei = BigInt(params.stakeAmount);
+      const pointsWei = BigInt(params.pointsReward);
+
+      // Check and handle ERC20 allowance (only for non-ETH tokens)
+      if (params.paymentToken !== '0x0000000000000000000000000000000000000000') {
+        const tokenContract = new ethers.Contract(params.paymentToken, ERC20_ABI, signer);
+        const allowance = await tokenContract.allowance(userAddress, FACTORY_ADDRESS);
+        const tokenLower = params.paymentToken.toLowerCase();
+        
+        if (allowance < stakeWei) {
+          // Determine token name based on address
+          let tokenName = 'TOKEN';
+          if (tokenLower === '0x9eba6af5f65ecb20e65c0c9e0b5cdbbbe9c5c00c0') {
+            tokenName = 'USDT';
+          } else if (tokenLower === '0x036cbd53842c5426634e7929541ec2318f3dcf7e') {
+            tokenName = 'USDC';
+          }
+          console.log(`🔓 Approving ${tokenName} for Challenge Factory...`);
+          toast({
+            title: 'Allowance Required',
+            description: `Please approve ${tokenName} spend in your wallet...`,
+          });
+          const approveTx = await tokenContract.approve(FACTORY_ADDRESS, stakeWei);
+          await approveTx.wait();
+          console.log(`✅ ${tokenName} approved!`);
+        }
+      }
+
+      // Checksum addresses to ensure proper format for ethers.js v6
+      console.log(`🔍 Checksumming addresses...`);
+      console.log(`   Raw opponent: ${params.opponentAddress}`);
+      console.log(`   Raw token: ${params.paymentToken}`);
+      
+      let checksummedOpponent, checksummedToken;
+      try {
+        checksummedOpponent = ethers.getAddress(params.opponentAddress);
+        console.log(`   ✓ Opponent checksummed: ${checksummedOpponent}`);
+      } catch (e) {
+        console.error(`   ✗ Failed to checksum opponent address:`, e);
+        throw new Error(`Invalid opponent address format: ${params.opponentAddress}`);
+      }
+      
+      try {
+        checksummedToken = ethers.getAddress(params.paymentToken);
+        console.log(`   ✓ Token checksummed: ${checksummedToken}`);
+      } catch (e) {
+        console.error(`   ✗ Failed to checksum token address:`, e);
+        throw new Error(`Invalid token address format: ${params.paymentToken}`);
+      }
+
+      console.log(`📝 Transaction details:`);
+      console.log(`   Opponent: ${checksummedOpponent}`);
+      console.log(`   Stake: ${params.stakeAmount} wei`);
+      console.log(`   Token: ${checksummedToken}`);
+      console.log(`   Points: ${params.pointsReward}`);
+
+      setIsRetrying(true);
+
+      // REQUIRED: Switch to Base Sepolia before sending transaction
+      await switchToBaseSepolia();
+
+      // Diagnostics: ensure contract exists at address
+      try {
+        const code = await provider.getCode(FACTORY_ADDRESS);
+        console.log(`📦 Contract code at ${FACTORY_ADDRESS}: ${code?.slice(0, 64)}... length=${code ? code.length : 0}`);
+        if (!code || code === '0x') {
+          throw new Error(`No contract deployed at address ${FACTORY_ADDRESS}`);
+        }
+      } catch (e) {
+        console.error('Failed to fetch contract code:', e);
+      }
+
+      return await retryTransaction(async () => {
+        console.log(`💳 Awaiting user to sign transaction...`);
+
+        // For native ETH, send the stake amount as msg.value. Only pass overrides when needed.
+        const isNativeETH = checksummedToken === '0x0000000000000000000000000000000000000000';
+        console.log(`💰 Is native ETH: ${isNativeETH}, Stake: ${stakeWei.toString()}`);
+
+        let tx;
+        if (isNativeETH) {
+          console.log(`✅ Sending ${stakeWei.toString()} wei as transaction value`);
+          tx = await contract.createP2PChallenge(
+            checksummedOpponent,
+            checksummedToken,
+            stakeWei,
+            pointsWei,
+            params.metadataURI,
+            { value: stakeWei }
+          );
+        } else {
+          tx = await contract.createP2PChallenge(
+            checksummedOpponent,
+            checksummedToken,
+            stakeWei,
+            pointsWei,
+            params.metadataURI
+          );
+        }
+
+        console.log(`⏳ Transaction submitted: ${tx.hash}`);
+        toast({
+          title: 'Transaction Submitted',
+          description: `Hash: ${tx.hash?.slice(0, 10)}...`,
+        });
+
+        const receipt = await tx.wait();
+
+        if (!receipt) {
+          throw new Error('Transaction receipt is null');
+        }
+
+        console.log(`✅ P2P challenge created on-chain!`);
+        console.log(`   TX: ${receipt.transactionHash}`);
+        console.log(`   Block: ${receipt.blockNumber}`);
+
+        return {
+          transactionHash: receipt.transactionHash,
+          blockNumber: receipt.blockNumber,
+          status: 'success' as const,
+        };
+      }, 'Create P2P Challenge');
+
+    } catch (error: any) {
+      console.error('Failed to create P2P challenge on-chain:', error);
+      throw error;
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  /**
+   * Accept a P2P challenge and submit to blockchain
+   */
+  const acceptP2PChallenge = async (params: AcceptChallengeParams): Promise<TransactionResult> => {
+    try {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Check if Privy is ready
+      if (!ready) {
+        throw new Error('Privy is not ready. Please wait for initialization.');
+      }
+
+      // In Privy v3, prioritize the connected wallet from user.wallet
+      let wallet = null;
+
+      // First try user.wallet (for connected external wallets like Rainbow, MetaMask, etc.)
+      if (user?.wallet) {
+        console.log('🔍 Using connected external wallet from user.wallet');
+        wallet = user.wallet;
+      }
+      // Fallback to wallets array (for embedded wallets)
+      else if (wallets && wallets.length > 0) {
+        console.log('🔍 Using wallets array (embedded wallets)');
+        const embeddedWallet = (wallets as any[]).find((w: any) => w.walletClientType === 'privy');
+        if (embeddedWallet) {
+          wallet = embeddedWallet;
+          console.log('🔍 Found embedded wallet:', wallet);
+        } else {
+          // Use any available wallet
+          wallet = wallets[0];
+          console.log('🔍 Using first available wallet:', wallet);
+        }
+      }
+
+      if (!wallet) {
+        throw new Error('No wallet available. Please connect your wallet first.');
+      }
+
+      console.log('🔍 Selected wallet:', wallet);
+
+      // Access the provider based on wallet type
+      let provider = null;
+
+      if (wallet.walletClientType === 'privy') {
+        // Embedded Privy wallet
+        provider = new ethers.BrowserProvider((wallet as any).provider as any);
+      } else {
+        // External wallet (Rainbow, MetaMask, etc.)
+        // For external wallets, we need to get the provider differently
+        if ((window as any).ethereum) {
+          provider = new ethers.BrowserProvider((window as any).ethereum);
+        } else {
+          throw new Error('No Ethereum provider available. Please install a Web3 wallet like MetaMask.');
+        }
+      }
+
+      if (!provider) {
+        throw new Error('Ethereum provider not available');
+      }
+
+      // Get the signer from the provider
+      const signer = await provider.getSigner();
+      if (!signer) {
+        throw new Error('Failed to get signer from wallet');
+      }
+
+      const userAddress = await signer.getAddress();
+
+      console.log(`🔗 Accepting P2P challenge ${params.challengeId}...`);
+      console.log(`📋 Contract address: ${FACTORY_ADDRESS}`);
+
+      // Validate contract address
+      if (!FACTORY_ADDRESS || FACTORY_ADDRESS === 'null' || FACTORY_ADDRESS === 'undefined') {
+        throw new Error(`Invalid contract address: ${FACTORY_ADDRESS}. Please check VITE_CHALLENGE_FACTORY_ADDRESS environment variable.`);
+      }
+
+      const contract = new ethers.Contract(
+        FACTORY_ADDRESS,
+        CHALLENGE_FACTORY_ABI,
+        signer
+      );
+
+      // Convert amounts to BigInt
+      const stakeWei = BigInt(params.stakeAmount);
+      const pointsWei = BigInt(params.pointsReward);
+
+      // Check and handle ERC20 allowance (only for non-ETH tokens)
+      if (params.paymentToken !== '0x0000000000000000000000000000000000000000') {
+        const tokenContract = new ethers.Contract(params.paymentToken, ERC20_ABI, signer);
+        const allowance = await tokenContract.allowance(userAddress, FACTORY_ADDRESS);
+        const tokenLower = params.paymentToken.toLowerCase();
+        
+        if (allowance < stakeWei) {
+          // Determine token name based on address
+          let tokenName = 'TOKEN';
+          if (tokenLower === '0x9eba6af5f65ecb20e65c0c9e0b5cdbbbe9c5c00c0') {
+            tokenName = 'USDT';
+          } else if (tokenLower === '0x036cbd53842c5426634e7929541ec2318f3dcf7e') {
+            tokenName = 'USDC';
+          }
+          console.log(`🔓 Approving ${tokenName} for Challenge Factory...`);
+          toast({
+            title: 'Allowance Required',
+            description: `Please approve ${tokenName} spend in your wallet...`,
+          });
+          const approveTx = await tokenContract.approve(FACTORY_ADDRESS, stakeWei);
+          await approveTx.wait();
+          console.log(`✅ ${tokenName} approved!`);
+        }
+      }
+
+      setIsRetrying(true);
+
+      // REQUIRED: Switch to Base Sepolia before sending transaction
+      await switchToBaseSepolia();
+
+      // Diagnostics: ensure contract exists at address
+      try {
+        const code = await provider.getCode(FACTORY_ADDRESS);
+        console.log(`📦 Contract code at ${FACTORY_ADDRESS}: ${code?.slice(0, 64)}... length=${code ? code.length : 0}`);
+        if (!code || code === '0x') {
+          throw new Error(`No contract deployed at address ${FACTORY_ADDRESS}`);
+        }
+      } catch (e) {
+        console.error('Failed to fetch contract code:', e);
+      }
+
+      return await retryTransaction(async () => {
+        console.log(`💳 Awaiting user to sign transaction...`);
+
+        // Contract supports both ETH and ERC20 tokens
+        const isNativeETH = checksummedToken === '0x0000000000000000000000000000000000000000';
+        console.log(`💰 Is native ETH: ${isNativeETH}, Stake: ${stakeWei.toString()}`);
+
+        let tx;
+        if (isNativeETH) {
+          console.log(`✅ Sending ${stakeWei.toString()} wei as transaction value`);
+          tx = await contract.acceptP2PChallenge(params.challengeId, { value: stakeWei });
+        } else {
+          tx = await contract.acceptP2PChallenge(params.challengeId);
+        }
+
+        console.log(`⏳ Transaction submitted: ${tx.hash}`);
+        toast({
+          title: 'Transaction Submitted',
+          description: `Hash: ${tx.hash?.slice(0, 10)}...`,
+        });
+
+        const receipt = await tx.wait();
+
+        if (!receipt) {
+          throw new Error('Transaction receipt is null');
+        }
+
+        console.log(`⏳ Transaction submitted: ${tx.hash}`);
+        toast({
+          title: 'Transaction Submitted',
+          description: `Hash: ${tx.hash?.slice(0, 10)}...`,
+        });
+
+        console.log(`✅ P2P challenge accepted on-chain!`);
+        console.log(`   TX: ${receipt.transactionHash}`);
+
+        return {
+          transactionHash: receipt.transactionHash,
+          blockNumber: receipt.blockNumber,
+          status: 'success' as const,
+        };
+      }, 'Accept P2P Challenge');
+
+    } catch (error: any) {
+      console.error('Failed to accept P2P challenge on-chain:', error);
+      throw error;
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  return {
+    createP2PChallenge,
+    acceptP2PChallenge,
+    switchChain,
+    factoryAddress: FACTORY_ADDRESS,
+    isRetrying,
+  };
+}

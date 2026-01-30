@@ -1,0 +1,164 @@
+#!/usr/bin/env node
+
+/**
+ * Deployment Script for Bantah On-Chain Challenges
+ * Deploys all three contracts to Base Testnet Sepolia
+ * 
+ * Usage: npx ts-node deploy.ts
+ * 
+ * Requires environment variables:
+ * - ADMIN_PRIVATE_KEY: Private key of admin account
+ */
+
+import * as ethers from "ethers";
+import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Read contract ABIs
+const readABI = (contractName: string): any => {
+  let abiPath = path.join(__dirname, "artifacts", "src", `${contractName}.sol`, `${contractName}.json`);
+  if (!fs.existsSync(abiPath)) {
+    abiPath = path.join(__dirname, "artifacts", `${contractName}.json`);
+  }
+  if (!fs.existsSync(abiPath)) {
+    console.error(`⚠️  Contract ${contractName}.json not found. Have you compiled contracts?`);
+    console.error(`Run: npx hardhat compile`);
+    process.exit(1);
+  }
+  const artifact = JSON.parse(fs.readFileSync(abiPath, "utf-8"));
+  return artifact.abi;
+};
+
+// Read compiled bytecode
+const readBytecode = (contractName: string): string => {
+  let artifactPath = path.join(__dirname, "artifacts", "src", `${contractName}.sol`, `${contractName}.json`);
+  if (!fs.existsSync(artifactPath)) {
+    artifactPath = path.join(__dirname, "artifacts", `${contractName}.json`);
+  }
+  const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
+  return artifact.bytecode;
+};
+
+async function deploy() {
+  try {
+    const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
+    if (!adminPrivateKey) {
+      console.error("❌ ADMIN_PRIVATE_KEY not set in environment");
+      process.exit(1);
+    }
+
+    // Setup provider and signer
+    const provider = new ethers.JsonRpcProvider("https://sepolia.base.org");
+    const wallet = new ethers.Wallet(adminPrivateKey, provider);
+
+    console.log("\n🚀 Deploying Bantah On-Chain Challenge System");
+    console.log(`📍 Network: Base Testnet Sepolia (Chain ID: 84532)`);
+    console.log(`👤 Deployer: ${wallet.address}`);
+
+    // Check balance
+    const balance = await provider.getBalance(wallet.address);
+    console.log(`💰 Balance: ${ethers.formatEther(balance)} ETH\n`);
+
+    if (balance === 0n) {
+      console.error("❌ No balance on deployer account. Get testnet ETH from faucet:");
+      console.error("   https://www.alchemy.com/faucets/base-sepolia");
+      process.exit(1);
+    }
+
+    // Step 1: Deploy BantahPoints token
+    console.log("📋 Step 1/5: Deploying BantahPoints.sol...");
+    const pointsBytecode = readBytecode("BantahPoints");
+    const pointsABI = readABI("BantahPoints");
+    
+    const pointsFactory = new ethers.ContractFactory(pointsABI, pointsBytecode, wallet);
+    const bantahPoints = await pointsFactory.deploy();
+    await bantahPoints.waitForDeployment();
+    const pointsAddress = await bantahPoints.getAddress();
+    console.log(`✅ BantahPoints deployed: ${pointsAddress}\n`);
+
+    // Step 2: Deploy ChallengeEscrow (needed for ChallengeFactory)
+    console.log("📋 Step 2/5: Deploying ChallengeEscrow.sol...");
+    const challengeEscrowBytecode = readBytecode("ChallengeEscrow");
+    const challengeEscrowABI = readABI("ChallengeEscrow");
+    
+    const challengeEscrowFactory = new ethers.ContractFactory(challengeEscrowABI, challengeEscrowBytecode, wallet);
+    const challengeEscrow = await challengeEscrowFactory.deploy(wallet.address);
+    await challengeEscrow.waitForDeployment();
+    const escrowAddress = await challengeEscrow.getAddress();
+    console.log(`✅ ChallengeEscrow deployed: ${escrowAddress}\n`);
+
+    // Step 3: Deploy ChallengeFactory
+    console.log("📋 Step 3/5: Deploying ChallengeFactory.sol...");
+    const factoryBytecode = readBytecode("ChallengeFactory");
+    const factoryABI = readABI("ChallengeFactory");
+    
+    const factoryFactory = new ethers.ContractFactory(factoryABI, factoryBytecode, wallet);
+    const platformFeeRecipient = wallet.address;
+    const challengeFactory = await factoryFactory.deploy(
+      pointsAddress,
+      escrowAddress,
+      wallet.address,
+      platformFeeRecipient
+    );
+    await challengeFactory.waitForDeployment();
+    const factoryAddress = await challengeFactory.getAddress();
+    console.log(`✅ ChallengeFactory deployed: ${factoryAddress}\n`);
+
+    // Update ChallengeEscrow to point to the real factory
+    const challengeEscrowInstance = new ethers.Contract(escrowAddress, challengeEscrowABI, wallet);
+    const setChallengeFactoryTx = await challengeEscrowInstance.setChallengeFactory(factoryAddress);
+    await setChallengeFactoryTx.wait();
+    console.log(`✅ Updated ChallengeEscrow to use ChallengeFactory\n`);
+
+    // All setup complete (BantahPoints and PointsEscrow are now off-chain)
+
+    // Output results
+    const envContent = `# Bantah On-Chain Challenge System - Base Testnet Sepolia
+# Generated by deploy.ts on ${new Date().toISOString()}
+
+VITE_BASE_TESTNET_RPC=https://sepolia.base.org
+VITE_CHAIN_ID=84532
+
+# Smart Contracts
+VITE_POINTS_CONTRACT_ADDRESS=${pointsAddress}
+VITE_CHALLENGE_FACTORY_ADDRESS=${factoryAddress}
+VITE_CHALLENGE_ESCROW_ADDRESS=${escrowAddress}
+
+# Tokens
+VITE_USDC_ADDRESS=0x833589fCD6eDb6E08f4c7C32D4f71b3566dA8860
+VITE_USDT_ADDRESS=0x3c499c542cEF5E3811e1192ce70d8cC7d307B653
+VITE_ETH_ADDRESS=0x0000000000000000000000000000000000000000
+
+# Admin (for signing challenge resolutions)
+ADMIN_PRIVATE_KEY=${adminPrivateKey}
+ADMIN_ADDRESS=${wallet.address}
+
+# Paymaster (for gas sponsorship)
+VITE_PAYMASTER_ADDRESS=<ADD_PAYMASTER_ADDRESS>
+VITE_ENTRY_POINT_ADDRESS=0x5FF137D4b0FDCD49DcA30c7B618636e2d6cf7c1e
+`;
+
+    fs.writeFileSync(".env.base-sepolia", envContent);
+    console.log("✅ Deployment Complete!\n");
+    console.log("📄 Contract Addresses:");
+    console.log(`   BantahPoints: ${pointsAddress}`);
+    console.log(`   ChallengeFactory: ${factoryAddress}`);
+    console.log(`   ChallengeEscrow: ${escrowAddress}\n`);
+    console.log("📝 Environment variables saved to .env.base-sepolia");
+    console.log("💡 Next steps:");
+    console.log("   1. Copy variables from .env.base-sepolia to root .env");
+    console.log("   2. Verify contracts on Basescan (optional)");
+    console.log("   3. Test creating challenges with ETH, USDT, and USDC\n");
+
+  } catch (error) {
+    console.error("❌ Deployment failed:");
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+deploy().catch(console.error);

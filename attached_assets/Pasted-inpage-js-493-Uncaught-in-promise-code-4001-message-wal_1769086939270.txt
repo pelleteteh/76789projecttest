@@ -1,0 +1,70 @@
+inpage.js:493 Uncaught (in promise) 
+{code: 4001, message: 'wallet must has at least one account'}
+onConnect	@	inpage.js:493
+await in onConnect		
+o.emit	@	pageProvider.js:2
+initialize	@	pageProvider.js:2
+await in initialize		
+x	@	pageProvider.js:2
+905561	@	pageProvider.js:2
+r	@	pageProvider.js:2
+(anonymous)	@	pageProvider.js:2
+(anonymous)	@	pageProvider.js:2
+(anonymous)	@	pageProvider.js:2
+inpage.js:493 Uncaught (in promise) 
+{code: 4001, message: 'wallet must has at least one account'}
+onConnect	@	inpage.js:493
+await in onConnect		
+o.emit	@	pageProvider.js:2
+initialize	@	pageProvider.js:2
+await in initialize		
+x	@	pageProvider.js:2
+905561	@	pageProvider.js:2
+r	@	pageProvider.js:2
+(anonymous)	@	pageProvider.js:2
+(anonymous)	@	pageProvider.js:2
+(anonymous)	@	pageProvider.js:2
+@radix-ui_react-dialog.js?v=ca17ce10:438 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous)	@	@radix-ui_react-dialog.js?v=ca17ce10:438
+commitHookEffectListMount	@	chunk-SM3OW2QE.js?v=ca17ce10:16915
+commitPassiveMountOnFiber	@	chunk-SM3OW2QE.js?v=ca17ce10:18156
+commitPassiveMountEffects_complete	@	chunk-SM3OW2QE.js?v=ca17ce10:18129
+commitPassiveMountEffects_begin	@	chunk-SM3OW2QE.js?v=ca17ce10:18119
+commitPassiveMountEffects	@	chunk-SM3OW2QE.js?v=ca17ce10:18109
+flushPassiveEffectsImpl	@	chunk-SM3OW2QE.js?v=ca17ce10:19490
+flushPassiveEffects	@	chunk-SM3OW2QE.js?v=ca17ce10:19447
+commitRootImpl	@	chunk-SM3OW2QE.js?v=ca17ce10:19416
+commitRoot	@	chunk-SM3OW2QE.js?v=ca17ce10:19277
+performSyncWorkOnRoot	@	chunk-SM3OW2QE.js?v=ca17ce10:18895
+flushSyncCallbacks	@	chunk-SM3OW2QE.js?v=ca17ce10:9119
+(anonymous)	@	chunk-SM3OW2QE.js?v=ca17ce10:18627
+Challenges.tsx:240 Blockchain submission failed, but challenge is stored in DB: TypeError: Cannot read properties of null (reading 'id')
+    at Object.mutationFn (Challenges.tsx:233:44)
+mutationFn	@	Challenges.tsx:240
+await in mutationFn		
+fn	@	@tanstack_react-query.js?v=ca17ce10:2029
+run	@	@tanstack_react-query.js?v=ca17ce10:822
+start	@	@tanstack_react-query.js?v=ca17ce10:865
+execute	@	@tanstack_react-query.js?v=ca17ce10:2070
+await in execute		
+mutate	@	@tanstack_react-query.js?v=ca17ce10:2422
+(anonymous)	@	@tanstack_react-query.js?v=ca17ce10:3648
+onClick	@	Challenges.tsx:706
+callCallback2	@	chunk-SM3OW2QE.js?v=ca17ce10:3674
+invokeGuardedCallbackDev	@	chunk-SM3OW2QE.js?v=ca17ce10:3699
+invokeGuardedCallback	@	chunk-SM3OW2QE.js?v=ca17ce10:3733
+invokeGuardedCallbackAndCatchFirstError	@	chunk-SM3OW2QE.js?v=ca17ce10:3736
+executeDispatch	@	chunk-SM3OW2QE.js?v=ca17ce10:7014
+processDispatchQueueItemsInOrder	@	chunk-SM3OW2QE.js?v=ca17ce10:7034
+processDispatchQueue	@	chunk-SM3OW2QE.js?v=ca17ce10:7043
+dispatchEventsForPlugins	@	chunk-SM3OW2QE.js?v=ca17ce10:7051
+(anonymous)	@	chunk-SM3OW2QE.js?v=ca17ce10:7174
+batchedUpdates$1	@	chunk-SM3OW2QE.js?v=ca17ce10:18913
+batchedUpdates	@	chunk-SM3OW2QE.js?v=ca17ce10:3579
+dispatchEventForPluginEventSystem	@	chunk-SM3OW2QE.js?v=ca17ce10:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay	@	chunk-SM3OW2QE.js?v=ca17ce10:5478
+dispatchEvent	@	chunk-SM3OW2QE.js?v=ca17ce10:5472
+dispatchDiscreteEvent	@	chunk-SM3OW2QE.js?v=ca17ce10:5449
+
+﻿
+

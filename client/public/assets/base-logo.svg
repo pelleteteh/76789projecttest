@@ -1,0 +1,20 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Base Chain Logo: Blue circle with white 'B' -->
+  <defs>
+    <linearGradient id="baseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0052FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0052FF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Blue Circle Background -->
+  <circle cx="100" cy="100" r="95" fill="url(#baseGradient)" />
+  
+  <!-- White 'B' Letter -->
+  <g transform="translate(100, 100)">
+    <path d="M -25 -35 L -25 35 L 15 35 Q 30 35 30 20 L 30 5 Q 30 -10 15 -10 L -25 -10 M -25 0 L 15 0 Q 28 0 28 15 L 28 20 Q 28 35 15 35" 
+          fill="none" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M -20 -30 L -20 30 L 10 30 Q 25 30 25 18 Q 25 8 10 8 L -20 8 M -20 8 L 10 8 Q 23 8 23 18 Q 23 30 10 30" 
+          fill="white"/>
+  </g>
+</svg>
